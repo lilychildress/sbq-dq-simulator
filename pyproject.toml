@@ -1,0 +1,38 @@
+[tool.poetry]
+name = "bff-simulator"
+version = "0.1.0"
+description = "Python scripts to simulate Double-Quantum experiments"
+authors = ["SBQuantum"]
+
+[tool.poetry.dependencies]
+python = ">=3.12,<3.13"
+numpy = "2.0.0"
+scipy = "^1.15.2"
+qutip = "5.0.4"
+pandas = "^2.2.3"
+
+[tool.poetry.dev-dependencies]
+mypy = "^1.6.0"
+ruff = "^0.1.14"
+pytest = "^7.3.1"
+
+[tool.poetry.group.plotting]
+optional = true
+
+[tool.poetry.group.plotting.dependencies]
+matplotlib = "^3.10.1"
+
+
+[build-system]
+requires = ["poetry==1.8.3"]
+build-backend = "poetry.masonry.api"
+
+
+[tool.ruff]
+line-length = 120
+
+
+[tool.ruff.lint]
+extend-select = ["I", "N"]  # To check imports, naming conventions
+extend-ignore = ["N818"] #  Ignore Exception should be named with an Error suffix
+# For more info, see https://docs.astral.sh/ruff/rules/

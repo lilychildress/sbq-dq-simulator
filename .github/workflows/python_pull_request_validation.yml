@@ -1,0 +1,38 @@
+# Strongly inspired from
+# https://github.com/actions/starter-workflows/blob/main/ci/python-package.yml
+
+name: Python pull request validation
+
+on: [pull_request]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - uses: webfactory/ssh-agent@v0.9.0
+      with:
+        ssh-private-key: ${{ secrets.SB_DEPLOYER }}
+    - name: Install poetry
+      run: pipx install poetry==1.8.3
+    - name: Set up python
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.12.x"
+        cache: poetry
+    - name: Poetry install
+      run: | 
+        poetry lock
+        poetry install
+    - name: Linter + imports
+      run: |
+        poetry run ruff check bff_simulator tests
+    - name: Format
+      run: |
+        poetry run ruff format bff_simulator tests --check
+    - name: Type hints
+      run: |
+        poetry run mypy bff_simulator tests
+    - name: Test
+      run: |
+        poetry run pytest tests
