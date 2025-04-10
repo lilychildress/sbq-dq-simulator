@@ -2,9 +2,10 @@
 
 ## Poetry
 - Install `uv` following the [documentation instructions](https://docs.astral.sh/uv/getting-started/installation/).
-- `uv sync` to use the commited `uv.lock` file.
+- `uv sync` to use the committed `uv.lock` file.
 
 - `uv lock` when you want to install by first updating and rewriting the `uv.lock` file.
+- To manually activate the created virtual environment you can use `.venv\Scripts\activate` on Windows and `source .venv/bin/activate` on macOS/Linux.
 
 ## General
 
