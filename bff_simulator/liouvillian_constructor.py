@@ -36,9 +36,9 @@ class LiouvillianConstructor:
     def construct_liouvillian(hamiltonian: NDArray, list_of_jump_operators: List[NDArray]) -> NDArray:
         liouvillian = LiouvillianConstructor.coherent_terms(hamiltonian)
         for jump_operator in list_of_jump_operators:
-            assert (
-                jump_operator.shape == hamiltonian.shape
-            ), "Jump operators must have the same shape as the Hamiltonian"
+            assert jump_operator.shape == hamiltonian.shape, (
+                "Jump operators must have the same shape as the Hamiltonian"
+            )
             liouvillian += LiouvillianConstructor.jump_term(jump_operator)
         return liouvillian
 

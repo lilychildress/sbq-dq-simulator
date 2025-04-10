@@ -1,31 +1,30 @@
-[tool.poetry]
+[project]
 name = "bff-simulator"
 version = "0.1.0"
 description = "Python scripts to simulate Double-Quantum experiments"
-authors = ["SBQuantum"]
+authors = [{name = "SBQuantum"}]
+readme = "README.md"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "numpy==2.0.0",
+    "scipy>=1.15.2",
+    "qutip==5.0.4",
+    "pandas>=2.2.3",
+]
 
-[tool.poetry.dependencies]
-python = ">=3.12,<3.13"
-numpy = "2.0.0"
-scipy = "^1.15.2"
-qutip = "5.0.4"
-pandas = "^2.2.3"
-
-[tool.poetry.dev-dependencies]
-mypy = "^1.6.0"
-ruff = "^0.1.14"
-pytest = "^7.3.1"
-
-[tool.poetry.group.plotting]
-optional = true
-
-[tool.poetry.group.plotting.dependencies]
-matplotlib = "^3.10.1"
-
+[dependency-groups]
+plotting = [
+    "matplotlib>=3.10.1",
+]
+dev = [
+    "mypy>=1.6.0",
+    "ruff>=0.1.14",
+    "pytest>=7.3.1"
+]
 
 [build-system]
-requires = ["poetry==1.8.3"]
-build-backend = "poetry.masonry.api"
+requires = ["hatchling"]
+build-backend = "hatchling.build"
 
 
 [tool.ruff]
