@@ -31,7 +31,7 @@ def imshow_with_extents(xaxis, yaxis, data: NDArray, aspect_ratio:float =1, vmin
     ystep = yaxis[1]-yaxis[0]
     extents = [min(xaxis)-xstep/2, max(xaxis)+xstep/2, min(yaxis)-ystep/2, max(yaxis)+ystep/2,]
     intrinsic_aspect_ratio = (max(yaxis)-min(yaxis) + ystep)/(max(xaxis)-min(xaxis)+xstep)
-    return plt.imshow(data, extent=extents, aspect=aspect_ratio/intrinsic_aspect_ratio, vmin=vmin, vmax=vmax, origin="lower", cmap="magma")
+    return plt.imshow(data, extent=extents, aspect=aspect_ratio/intrinsic_aspect_ratio, vmin=vmin, vmax=vmax, origin="lower", cmap="inferno")
 
 def imshow_with_extents_and_crop(xaxis:NDArray, yaxis:NDArray, data: NDArray, aspect_ratio:float =1, xmin=None, xmax=None, ymin= None, ymax =None, vmin=None, vmax=None):
     small_quantity_to_ensure_no_cropping = 1
@@ -99,5 +99,5 @@ for i in range(4):
     for j in [0.5, 1, 1.5, 2]:
         plt.plot([12e6 if i !=0 else 25e6, ramsey_max],[j*rabi_frequencies[i],j*rabi_frequencies[i]], color=colors[i])
 
-#plt.savefig("figure3.svg", format="svg")
+plt.savefig("figure3.svg", format="svg")
 plt.show()
