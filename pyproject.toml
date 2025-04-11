@@ -17,7 +17,7 @@ ruff = "^0.1.14"
 pytest = "^7.3.1"
 
 [tool.poetry.group.plotting]
-optional = true
+optional = false
 
 [tool.poetry.group.plotting.dependencies]
 matplotlib = "^3.10.1"
