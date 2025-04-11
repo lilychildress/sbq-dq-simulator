@@ -6,7 +6,7 @@
         {
             "label": "Mypy",
             "type": "shell",
-            "command": "poetry run mypy .",
+            "command": "uv run mypy .",
             "problemMatcher": [],
             "group": "build"
         },

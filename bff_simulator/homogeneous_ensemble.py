@@ -91,9 +91,9 @@ class HomogeneousEnsemble(NVEnsemble):
             nv_species.weight = weight
 
     def set_individual_weights(self, weights: List[float]):
-        assert len(weights) == len(
-            self.populations
-        ), f"len(weights) must equal len(populations). Got {len(weights)} and {len(self.populations)}"
+        assert len(weights) == len(self.populations), (
+            f"len(weights) must equal len(populations). Got {len(weights)} and {len(self.populations)}"
+        )
         for weight, nv_species in zip(weights, self._populations):
             nv_species.weight = weight
 
