@@ -48,7 +48,7 @@ def imshow_with_extents_and_crop(xaxis:NDArray, yaxis:NDArray, data: NDArray, as
     imshow_with_extents(xaxis[x_mask], yaxis[y_mask],abs(data[y_mask,:][:,x_mask]), vmin=vmin, vmax=vmax, aspect_ratio=aspect_ratio)
 
 rabi_frequencies=[RABI_FREQ_BASE_HZ*perpendicular_projection(MW_DIRECTION, NVaxis) for NVaxis in NVaxes_100]
-print(NVaxes_100)
+
 nv_ensemble = HomogeneousEnsemble()
 nv_ensemble.efield_splitting_hz = np.linalg.norm(E_FIELD_VECTOR_V_PER_CM) * exy
 nv_ensemble.t2_star_s = T2STAR_S
@@ -93,7 +93,7 @@ imshow_with_extents_and_crop(ramseyfreqs,rabifreqs, abs(fourier_transform_sq_sub
 plt.colorbar()
 
 colors = list(TABLEAU_COLORS.keys())[:4]
-print(colors)
+
 print(B_FIELD_VECTOR_T)
 for i in range(4):
     for j in [0.5, 1, 1.5, 2]:
