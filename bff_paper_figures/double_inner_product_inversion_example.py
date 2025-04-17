@@ -8,7 +8,7 @@ from bff_simulator.liouvillian_solver import LiouvillianSolver
 from bff_simulator.offaxis_field_experiment_parameters import OffAxisFieldExperimentParametersFactory
 from bff_simulator.simulator import Simulation
 from bff_paper_figures.inner_product_functions import InnerProductSettings, double_cosine_inner_product_vs_ramsey
-from bff_paper_figures.fit_inner_product_vs_ramsey import (
+from bff_paper_figures.fitting_routines import (
     fit_constrained_hyperfine_peaks,
     plot_fit_vs_inner_product,
     fit_vs_eigenvalue_error_nT,

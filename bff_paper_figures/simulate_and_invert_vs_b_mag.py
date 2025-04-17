@@ -1,5 +1,6 @@
 import numpy as np
 from matplotlib import pyplot as plt
+from scipy.signal import windows
 
 from bff_simulator.constants import exy
 from bff_simulator.homogeneous_ensemble import HomogeneousEnsemble
@@ -9,9 +10,11 @@ from bff_simulator.offaxis_field_experiment_parameters import OffAxisFieldExperi
 from bff_paper_figures.simulate_and_invert_helper_functions import (
     sq_cancelled_signal_generator,
     double_cosine_inner_product_fit_inversion,
+    time_domain_fit_inversion,
 )
 from bff_paper_figures.inner_product_functions import InnerProductSettings
-from bff_paper_figures.extract_experiment_values import get_bare_rabi_frequencies
+from bff_paper_figures.fitting_routines import fit_vs_eigenvalue_error_all_orientations_nT, extract_fit_centers_all_orientations
+from bff_paper_figures.extract_experiment_values import get_bare_rabi_frequencies, get_true_eigenvalues
 
 T_TO_UT = 1e6
 HZ_TO_MHZ = 1e-6
@@ -31,6 +34,8 @@ EVOLUTION_TIME_S = np.arange(0, 5e-6, 20e-9)  # p.linspace(0, 15e-6, 801)
 T2STAR_S = 2e-6
 N_RAMSEY_POINTS = 251
 RAMSEY_FREQ_RANGE_INITIAL_GUESS_HZ = np.linspace(0, 10e6, N_RAMSEY_POINTS)
+
+PEAK_INDEX = 0 # 0 is highest-frequency peak
 
 nv_ensemble = HomogeneousEnsemble()
 nv_ensemble.efield_splitting_hz = np.linalg.norm(E_FIELD_VECTOR_V_PER_CM) * exy
@@ -60,12 +65,15 @@ inner_product_settings = InnerProductSettings(
 b_field_vector_values_t = [mag*B_FIELD_VECTOR_DIRECTION for mag in B_MAGNITUDES_T]
 rabi_frequencies = get_bare_rabi_frequencies(exp_param_factory.get_experiment_parameters())
 
-errors_vs_b_nT = []
+errors_vs_b_peakfit_nT = []
+errors_vs_b_cosfit_nT = []
 for b_field_vector_t in b_field_vector_values_t:
     exp_param_factory.set_b_field_vector(b_field_vector_t)
     sq_cancelled_signal = sq_cancelled_signal_generator(exp_param_factory, nv_ensemble, off_axis_solver)
 
-    errors_nT = double_cosine_inner_product_fit_inversion(
+    larmor_freqs_all_axes_hz, _ = get_true_eigenvalues(exp_param_factory.get_experiment_parameters())
+        
+    peakfit_results = double_cosine_inner_product_fit_inversion(
         sq_cancelled_signal,
         exp_param_factory.get_experiment_parameters(),
         inner_product_settings,
@@ -74,15 +82,29 @@ for b_field_vector_t in b_field_vector_values_t:
         constrain_same_width=True,
         allow_zero_peak=True,
     )
+    errors_nT = fit_vs_eigenvalue_error_all_orientations_nT(peakfit_results, larmor_freqs_all_axes_hz)
+    print(f"B = {np.array2string(T_TO_UT*b_field_vector_t, precision=1)} uT, peakfit errors = {np.array2string(errors_nT[:, PEAK_INDEX], precision=2)} nT")
+    errors_vs_b_peakfit_nT.append(errors_nT[:, PEAK_INDEX])
 
-    print(f"B = {np.array2string(T_TO_UT*b_field_vector_t, precision=1)} uT, largest eigenvalue errors = {np.array2string(errors_nT[:, 2], precision=2)} nT")
-    errors_vs_b_nT.append(errors_nT[:, 2])
-
+    freq_guesses_all_orientations = extract_fit_centers_all_orientations(peakfit_results)
+    time_domain_fit_results = time_domain_fit_inversion(
+        sq_cancelled_signal, 
+        exp_param_factory.get_experiment_parameters(), 
+        inner_product_settings, 
+        freq_guesses_all_orientations, 
+        T2STAR_S,
+        fix_phase_to_zero= False,
+        constrain_same_decay= True,
+        constrain_hyperfine_freqs= True)
+    errors_nT = fit_vs_eigenvalue_error_all_orientations_nT(time_domain_fit_results, larmor_freqs_all_axes_hz)
+    print(f"\t \t time domain fit errors = {np.array2string(errors_nT[:, PEAK_INDEX], precision=2)} nT")
+    errors_vs_b_cosfit_nT.append(errors_nT[:, PEAK_INDEX])
+    
 for orientation in NVOrientation:
-    plt.plot(T_TO_UT*B_MAGNITUDES_T, np.array(errors_vs_b_nT)[:,orientation], label=f"Rabi: {HZ_TO_MHZ*rabi_frequencies[orientation]:.1f} MHz")
+    plt.plot(T_TO_UT*B_MAGNITUDES_T, np.array(errors_vs_b_peakfit_nT)[:,orientation], linestyle="dashed",  label=f"Rabi: {HZ_TO_MHZ*rabi_frequencies[orientation]:.1f} MHz")
+    plt.plot(T_TO_UT*B_MAGNITUDES_T, np.array(errors_vs_b_cosfit_nT)[:,orientation], label=f"Rabi: {HZ_TO_MHZ*rabi_frequencies[orientation]:.1f} MHz")
 plt.xlabel("Magnetic field magnitude (uT) along <4,2,1>")
 plt.ylabel("Inversion error (nT) from largest eigenvalue")
-plt.legend()
 plt.title(
     f"T2* = {T2STAR_S*1e6} us, Rabi window: {inner_product_settings.rabi_window}, Ramsey window: {inner_product_settings.ramsey_window},\n{'mean subtracted' if inner_product_settings.subtract_mean else ''}, {'using effective Rabi' if inner_product_settings.use_effective_rabi_frequency else ''}"
 )

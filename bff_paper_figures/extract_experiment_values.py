@@ -1,4 +1,5 @@
 import numpy as np
+from numpy.typing import NDArray
 from bff_simulator.constants import NVaxes_100, f_h, gammab, exy, ez
 from bff_simulator.vector_manipulation import transform_from_crystal_to_nv_coords, perpendicular_projection
 from bff_simulator.offaxis_field_hamiltonian_constructor import OffAxisFieldHamiltonian
@@ -11,13 +12,13 @@ def get_bare_rabi_frequencies(experiment_parameters: OffAxisFieldExperimentParam
     return [base_rabi_hz * perpendicular_projection(mw_direction, NVaxis) for NVaxis in NVaxes_100]
 
 
-def get_true_eigenvalues(off_axis_experiment_parameters: OffAxisFieldExperimentParameters):
+def get_true_eigenvalues(off_axis_experiment_parameters: OffAxisFieldExperimentParameters) -> tuple[NDArray]:
     larmor_freqs_hz = []
     bz_values_nv_coords_t = []
     for NVaxis in NVaxes_100:
         bz_values_for_this_axis = []
         larmor_freqs_for_this_axis = []
-        for m_hyperfine in [-1, 0, 1]:
+        for m_hyperfine in [1, 0, -1]:
             nv_axis_unit_vector = NVaxis / np.linalg.norm(NVaxis)
 
             b_field_vector_t_nv_coords = transform_from_crystal_to_nv_coords(
@@ -37,4 +38,4 @@ def get_true_eigenvalues(off_axis_experiment_parameters: OffAxisFieldExperimentP
             larmor_freqs_for_this_axis.append(abs((evals[2] - evals[0]) / (2 * np.pi)))
         bz_values_nv_coords_t.append(bz_values_for_this_axis)
         larmor_freqs_hz.append(larmor_freqs_for_this_axis)
-    return larmor_freqs_hz, bz_values_nv_coords_t
+    return np.array(larmor_freqs_hz), np.array(bz_values_nv_coords_t)

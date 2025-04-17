@@ -1,5 +1,7 @@
 import numpy as np
 from numpy.typing import NDArray
+from lmfit.model import ModelResult
+from scipy.signal import windows
 
 from bff_simulator.homogeneous_ensemble import HomogeneousEnsemble
 from bff_simulator.liouvillian_solver import LiouvillianSolver
@@ -9,10 +11,11 @@ from bff_simulator.offaxis_field_experiment_parameters import (
 )
 from bff_simulator.simulator import Simulation
 from bff_simulator.abstract_classes.abstract_ensemble import NVOrientation
-from bff_paper_figures.inner_product_functions import double_cosine_inner_product_vs_ramsey
-from bff_paper_figures.fit_inner_product_vs_ramsey import (
+from bff_paper_figures.inner_product_functions import double_cosine_inner_product_vs_ramsey, inner_product_sinusoid
+from bff_paper_figures.fitting_routines import (
     fit_constrained_hyperfine_peaks,
     fit_vs_eigenvalue_error_nT,
+    fit_three_cos_model,
     extract_fit_centers,
 )
 from bff_paper_figures.extract_experiment_values import get_bare_rabi_frequencies, get_true_eigenvalues
@@ -43,12 +46,11 @@ def double_cosine_inner_product_fit_inversion(
     t2star_s: float,
     constrain_same_width: bool = True,
     allow_zero_peak:bool = True,
-) -> NDArray:
+) -> list[type[ModelResult]]:
     rabi_frequencies = get_bare_rabi_frequencies(off_axis_experiment_parameters)
-    larmor_freqs_all_axes_hz, _ = get_true_eigenvalues(off_axis_experiment_parameters)
 
-    errors_nT = []
-    for i, orientation in enumerate(NVOrientation):
+    fit_results = []
+    for orientation in NVOrientation:
         cos_cos_inner_prod = double_cosine_inner_product_vs_ramsey(
             sq_cancelled_signal, rabi_frequencies[orientation], ramsey_freq_range_init_guess_hz, inner_product_settings
         )
@@ -69,7 +71,19 @@ def double_cosine_inner_product_fit_inversion(
         fit_result = fit_constrained_hyperfine_peaks(
             ramsey_freq_range_constrained_hz, cos_cos_inner_prod, t2star_s, constrain_same_width=constrain_same_width
         )
+        fit_results.append(fit_result)
 
-        errors_nT.append(fit_vs_eigenvalue_error_nT(fit_result, larmor_freqs_all_axes_hz[orientation]))
+    return fit_results
 
-    return np.array(errors_nT)
+def time_domain_fit_inversion(sq_cancelled_signal: NDArray, off_axis_experiment_parameters: OffAxisFieldExperimentParameters, inner_product_settings: InnerProductSettings, ramsey_freq_guesses_all_orientations: NDArray, t2star_s:float, fix_phase_to_zero:bool=False, constrain_same_decay:bool=False, constrain_hyperfine_freqs:bool=False):
+    rabi_frequencies = get_bare_rabi_frequencies(off_axis_experiment_parameters)
+    mw_pulse_length_s = off_axis_experiment_parameters.mw_pulse_length_s
+    evolution_time_s = off_axis_experiment_parameters.evolution_time_s
+    fit_results = []
+    rabi_window = windows.get_window(inner_product_settings.rabi_window, len(mw_pulse_length_s))
+    for orientation in NVOrientation:
+        time_domain_ramsey_signal = inner_product_sinusoid(np.cos, rabi_frequencies[orientation], mw_pulse_length_s, rabi_window*np.transpose(sq_cancelled_signal),axis=1)
+        time_domain_result = fit_three_cos_model(evolution_time_s, time_domain_ramsey_signal, ramsey_freq_guesses_all_orientations[orientation], t2star_s, fix_phase_to_zero, constrain_same_decay, constrain_hyperfine_freqs)
+        fit_results.append(time_domain_result)
+    
+    return fit_results
