@@ -36,15 +36,20 @@ B_PHI_N_MIN = 5
 RABI_FREQ_BASE_HZ = 100e6
 DETUNING_HZ = 0e6
 SECOND_PULSE_PHASE = 0
-MW_PULSE_LENGTH_S = np.arange(0, 400e-9, 2.5e-9)  # np.linspace(0, 0.5e-6, 1001)
-EVOLUTION_TIME_S = np.arange(0, 5e-6, 20e-9)  # p.linspace(0, 15e-6, 801)
+MW_PULSE_LENGTH_S = np.arange(0, 800e-9, 2.5e-9)  # np.linspace(0, 0.5e-6, 1001)
+EVOLUTION_TIME_S = np.arange(0, 3e-6, 20e-9)  # p.linspace(0, 15e-6, 801)
 T2STAR_S = 2e-6
 N_RAMSEY_POINTS = 251
 RAMSEY_FREQ_RANGE_INITIAL_GUESS_HZ = np.linspace(0, 10e6, N_RAMSEY_POINTS)
 
 PEAK_INDEX = 0 # Which frequency we will be comparing to expected value; 0 is highest-frequency peak
 
-RUN_LABEL = f"b_{B_MAGNITUDE_T*T_TO_UT:.0f}_ut_t2s_{T2STAR_S*1e6:.0f}_us_apr16"
+RUN_LABEL = f"b_{B_MAGNITUDE_T*T_TO_UT:.0f}_ut_t2s_{T2STAR_S*1e6:.0f}_us_fine_3us_ramsey_800ns_rabi"
+
+def angles_already_evaluated(test_theta, test_phi, theta_values, phi_values):
+    theta_indices = np.where(np.isclose(theta_values, test_theta))
+    phi_indices = np.where(np.isclose(phi_values, test_phi))
+    return len(np.intersect1d(theta_indices, phi_indices)) > 0
 
 nv_ensemble = HomogeneousEnsemble()
 nv_ensemble.efield_splitting_hz = np.linalg.norm(E_FIELD_VECTOR_V_PER_CM) * exy
@@ -78,50 +83,68 @@ phi_values = []
 errors_vs_b_freq_domain_nT = []
 errors_vs_b_time_domain_nT = []
 
+
+errors_vs_b_freq_domain_nT = list(np.loadtxt(f"errors_nt_freq_{RUN_LABEL}.txt"))
+errors_vs_b_time_domain_nT = list(np.loadtxt(f"errors_nt_time_{RUN_LABEL}.txt", ))
+phi_values = list(np.loadtxt(f"phi_values_{RUN_LABEL}.txt"))
+theta_values = list(np.loadtxt(f"theta_values_{RUN_LABEL}.txt"))
+
+problem_theta_values = []
+problem_phi_values = []
+
 for theta in np.linspace(B_THETA_START, B_THETA_STOP, B_THETA_N):
     b_phi_n = max(B_PHI_N_MIN, floor(np.sin(theta)*B_PHI_N_MAX))
     for phi in np.linspace(B_PHI_START, B_PHI_STOP, b_phi_n):
-        theta_values.append(theta)
-        phi_values.append(phi)
-        b_field_vector_t = B_MAGNITUDE_T*np.array([np.sin(theta)*np.cos(phi), np.sin(theta)*np.sin(phi), np.cos(theta)])
-        exp_param_factory.set_b_field_vector(b_field_vector_t)
-        sq_cancelled_signal = sq_cancelled_signal_generator(exp_param_factory, nv_ensemble, off_axis_solver)
+        if not angles_already_evaluated(theta, phi, theta_values, phi_values):
+            b_field_vector_t = B_MAGNITUDE_T*np.array([np.sin(theta)*np.cos(phi), np.sin(theta)*np.sin(phi), np.cos(theta)])
+            exp_param_factory.set_b_field_vector(b_field_vector_t)
+            sq_cancelled_signal = sq_cancelled_signal_generator(exp_param_factory, nv_ensemble, off_axis_solver)
 
-        larmor_freqs_all_axes_hz, bz_values_all_axes_t = get_true_eigenvalues(exp_param_factory.get_experiment_parameters())
+            larmor_freqs_all_axes_hz, bz_values_all_axes_t = get_true_eigenvalues(exp_param_factory.get_experiment_parameters())
 
-        # frequency domain inversion
-        peakfit_results = double_cosine_inner_product_fit_inversion(
-            sq_cancelled_signal,
-            exp_param_factory.get_experiment_parameters(),
-            inner_product_settings,
-            RAMSEY_FREQ_RANGE_INITIAL_GUESS_HZ,
-            T2STAR_S,
-            constrain_same_width=True,
-            allow_zero_peak=True,
-        )
-        errors_nT = fit_vs_eigenvalue_error_all_orientations_nT(peakfit_results, larmor_freqs_all_axes_hz)
-        print(f"theta = {theta:.2f}, phi = {phi:.2f}, freq domain errors = {np.array2string(errors_nT[:, PEAK_INDEX], precision=2)} nT") 
-        errors_vs_b_freq_domain_nT.append(errors_nT[:, PEAK_INDEX])
+            try:    
+                # frequency domain inversion
+                peakfit_results = double_cosine_inner_product_fit_inversion(
+                    sq_cancelled_signal,
+                    exp_param_factory.get_experiment_parameters(),
+                    inner_product_settings,
+                    RAMSEY_FREQ_RANGE_INITIAL_GUESS_HZ,
+                    T2STAR_S,
+                    constrain_same_width=True,
+                    allow_zero_peak=True,
+                )
+                errors_fd_nT = fit_vs_eigenvalue_error_all_orientations_nT(peakfit_results, larmor_freqs_all_axes_hz)
+                print(f"theta = {theta:.2f}, phi = {phi:.2f}, freq domain errors = {np.array2string(errors_fd_nT[:, PEAK_INDEX], precision=2)} nT") 
 
-        # time domain inversion
-        freq_guesses_all_orientations = extract_fit_centers_all_orientations(peakfit_results)
-        time_domain_fit_results = time_domain_fit_inversion(
-            sq_cancelled_signal, 
-            exp_param_factory.get_experiment_parameters(), 
-            inner_product_settings, 
-            freq_guesses_all_orientations, 
-            T2STAR_S,
-            fix_phase_to_zero= False,
-            constrain_same_decay= True,
-            constrain_hyperfine_freqs= True)
-        errors_nT = fit_vs_eigenvalue_error_all_orientations_nT(time_domain_fit_results, larmor_freqs_all_axes_hz)
-        print(f"\t \t \t time domain fit errors = {np.array2string(errors_nT[:, PEAK_INDEX], precision=3)} nT")
-        errors_vs_b_time_domain_nT.append(errors_nT[:, PEAK_INDEX])
+                # time domain inversion
+                freq_guesses_all_orientations = extract_fit_centers_all_orientations(peakfit_results)
+                time_domain_fit_results = time_domain_fit_inversion(
+                    sq_cancelled_signal, 
+                    exp_param_factory.get_experiment_parameters(), 
+                    inner_product_settings, 
+                    freq_guesses_all_orientations, 
+                    T2STAR_S,
+                    fix_phase_to_zero= False,
+                    constrain_same_decay= True,
+                    constrain_hyperfine_freqs= True)
+                errors_td_nT = fit_vs_eigenvalue_error_all_orientations_nT(time_domain_fit_results, larmor_freqs_all_axes_hz)
+                print(f"\t \t \t time domain fit errors = {np.array2string(errors_td_nT[:, PEAK_INDEX], precision=3)} nT")
+                
+                errors_vs_b_freq_domain_nT.append(errors_fd_nT[:, PEAK_INDEX])
+                errors_vs_b_time_domain_nT.append(errors_td_nT[:, PEAK_INDEX])
+                theta_values.append(theta)
+                phi_values.append(phi)
+            except ValueError:
+                print(f"theta = {theta:.8f}, phi = {phi:.8f} generated ValueError ")
+                problem_theta_values.append(theta)
+                problem_phi_values.append(phi)
  
     np.savetxt(f"errors_nt_freq_{RUN_LABEL}.txt", errors_vs_b_freq_domain_nT)
     np.savetxt(f"errors_nt_time_{RUN_LABEL}.txt", errors_vs_b_time_domain_nT)
     np.savetxt(f"phi_values_{RUN_LABEL}.txt", phi_values)
     np.savetxt(f"theta_values_{RUN_LABEL}.txt", theta_values)
+    np.savetxt(f"problem_phi_values_{RUN_LABEL}.txt", problem_phi_values)
+    np.savetxt(f"problem_theta_values_{RUN_LABEL}.txt", problem_theta_values)
     
 for i,orientation in enumerate(NVOrientation):
     plt.subplot(2,2,i+1)

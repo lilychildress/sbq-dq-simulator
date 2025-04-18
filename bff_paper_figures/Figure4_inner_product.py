@@ -1,5 +1,6 @@
 import numpy as np
 from matplotlib import pyplot as plt
+from matplotlib.ticker import (MultipleLocator, AutoMinorLocator)
 from scipy.optimize import fsolve
 from scipy.signal import windows
 from bff_simulator.constants import f_h, gammab, exy, NVaxes_100
@@ -17,13 +18,15 @@ from bff_paper_figures.inner_product_functions import InnerProductSettings, doub
 from bff_paper_figures.fitting_routines import (
     fit_constrained_hyperfine_peaks,
     extract_fit_centers,
+    set_up_three_cos_model,
+    fit_three_cos_model
 )
 
 
 T_TO_UT = 1e6
 HZ_TO_MHZ = 1e-6
 
-# Generate the example data set at 50 uT and a fairly random field angle
+# Generate the example data set at 50 uT and an arbitrary field angle
 
 MW_DIRECTION = np.array([0.20539827217056314, 0.11882075246379901, 0.9714387158093318])  # Lily's new "magic angle"
 E_FIELD_VECTOR_V_PER_CM = 0 * np.array([1e5, 3e5, 0]) / exy
@@ -36,7 +39,7 @@ RABI_FREQ_BASE_HZ = 100e6
 DETUNING_HZ = 0e6
 SECOND_PULSE_PHASE = 0
 MW_PULSE_LENGTH_S = np.arange(0, 400e-9, 2.5e-9)  # np.linspace(0, 0.5e-6, 1001)
-EVOLUTION_TIME_S = np.arange(0, 5e-6, 20e-9)  # p.linspace(0, 15e-6, 801)
+EVOLUTION_TIME_S = np.arange(0, 3e-6, 10e-9)  # p.linspace(0, 15e-6, 801)
 T2STAR_S = 2e-6
 N_RAMSEY_POINTS = 251
 RAMSEY_FREQ_RANGE_INITIAL_GUESS_HZ = np.linspace(0, 8.5e6, N_RAMSEY_POINTS)
@@ -44,8 +47,11 @@ RAMSEY_FREQ_RANGE_INITIAL_GUESS_HZ = np.linspace(0, 8.5e6, N_RAMSEY_POINTS)
 RAD_TO_DEGREE = 360/(2*np.pi)
 PHI_RANGE_HALF_HYPERFINE = np.linspace(1.4607, 3.25133, 301)
 
-EXAMPLE_ORIENTATION = 3
+EXAMPLE_ORIENTATION = 3 # Orientation index that we will analyze in detail
 
+base_path = "/Users/lilianchildress/Documents/GitHub/sbq-dq-simulator/bff_paper_figures/data/"
+
+# Set up the simulation
 nv_ensemble = HomogeneousEnsemble()
 nv_ensemble.efield_splitting_hz = np.linalg.norm(E_FIELD_VECTOR_V_PER_CM) * exy
 nv_ensemble.t2_star_s = T2STAR_S
@@ -66,10 +72,11 @@ b_field_vector_t = B_MAGNITUDE_T*np.array([np.sin(B_THETA)*np.cos(B_PHI), np.sin
 exp_param_factory.set_b_field_vector(b_field_vector_t)
 sq_cancelled_signal = sq_cancelled_signal_generator(exp_param_factory, nv_ensemble, off_axis_solver)
 
+# Extract the rabi frequency for each orientation for the MW_DIRECTION set in the experiment parameters
 rabi_frequencies = get_bare_rabi_frequencies(exp_param_factory.get_experiment_parameters())
 
-# Plot the double inner product
-
+###################################################################
+# Plot the double inner product over rabifreqs, ramseyfreqs range
 rabifreqs = np.linspace(60e6, 100e6, 201)
 ramseyfreqs = np.linspace(0, 8.5e6, 251)
 
@@ -83,14 +90,20 @@ inner_product_settings = InnerProductSettings(
 )
 
 dtft = np.array([[double_cosine_inner_product(sq_cancelled_signal, rabi_hz, ramsey_hz, inner_product_settings) for ramsey_hz in ramseyfreqs] for rabi_hz in rabifreqs])
-imshow_with_extents_and_crop(1e-6*ramseyfreqs,1e-6*rabifreqs, -dtft/min(dtft.flatten()),ymin=60, ymax=100, xmin=0, xmax=8.5)
+imshow_with_extents_and_crop(HZ_TO_MHZ*ramseyfreqs,HZ_TO_MHZ*rabifreqs, -dtft/min(dtft.flatten()),ymin=60, ymax=100, xmin=0, xmax=8.5)
 plt.colorbar(orientation="horizontal",location="top", shrink=0.6, label="2D inner product amplitude (a.u.)")
-plt.plot(1e-6*ramseyfreqs, np.sqrt((1e-6*rabi_frequencies[3])**2 + (1e-6*ramseyfreqs)**2), color="white")
-plt.savefig("double_inner_product.svg")
+plt.plot(HZ_TO_MHZ*ramseyfreqs, np.sqrt((HZ_TO_MHZ*rabi_frequencies[EXAMPLE_ORIENTATION])**2 + (HZ_TO_MHZ*ramseyfreqs)**2), color="white")
+plt.gca().xaxis.set_ticks_position("both")
+plt.gca().yaxis.set_ticks_position("both")
+plt.gca().minorticks_on()
+plt.gca().tick_params(direction="in", which = "both", width=1.5)
+plt.gca().tick_params(direction="in", which = "minor", length=2.5)
+plt.gca().tick_params(direction="in", which = "major", length=5)
+plt.savefig(base_path+"double_inner_product.svg")
 plt.show()
 
+#############################################################
 # Plot the associated filter function for boxcar and blackman
-
 fake_signal = np.cos(2*np.pi*np.sqrt(rabi_frequencies[3]**2 +max(ramseyfreqs)**2)*MW_PULSE_LENGTH_S)
 blackman_window = windows.get_window("blackman", len(MW_PULSE_LENGTH_S))
 
@@ -98,13 +111,21 @@ boxcar_filter_function=np.array([inner_product_sinusoid(np.cos, rabi_hz, MW_PULS
 blackman_filter_function=np.array([inner_product_sinusoid(np.cos, rabi_hz, MW_PULSE_LENGTH_S, fake_signal*blackman_window) for rabi_hz in rabifreqs])
 
 fig = plt.figure(0,(1,5))
-plt.plot(boxcar_filter_function,1e-6*rabifreqs, label="Boxcar")
-plt.plot(blackman_filter_function,1e-6*rabifreqs, label="Blackman")
-plt.gca().yaxis.set_ticks_position("right")
+plt.plot(boxcar_filter_function,HZ_TO_MHZ*rabifreqs, label="Boxcar")
+plt.ylim((60, 100))
+plt.plot(blackman_filter_function,HZ_TO_MHZ*rabifreqs, label="Blackman")
+plt.gca().yaxis.set_ticks_position("both")
+plt.gca().xaxis.set_ticks_position("both")
+plt.gca().minorticks_on()
+plt.gca().tick_params(direction="in", which = "both", width=1.5)
+plt.gca().tick_params(direction="in", which = "minor", length=2.5)
+plt.gca().tick_params(direction="in", which = "major", length=5)
 plt.legend(loc="lower left")
-plt.savefig("filter_functions.svg")
+plt.savefig(base_path+"filter_functions.svg")
 plt.show()
 
+##########################################################
+# Calculate and plot the frequency domain fit
 # Do the fit (first fit is to set the fitting range)
 inner_product_settings.use_effective_rabi_frequency=True
 inner_product_settings.rabi_window="blackman"
@@ -116,22 +137,22 @@ first_attempt_peaks = extract_fit_centers(
     fit_constrained_hyperfine_peaks(RAMSEY_FREQ_RANGE_INITIAL_GUESS_HZ, cos_cos_inner_prod_init, T2STAR_S)
 )
 
+# Set the smaller fitting range (yields a better fit by avoiding zero frequency and frequencies with little information)
 min_ramsey_freq_hz = max(2 / (np.pi * T2STAR_S), min(first_attempt_peaks) - 2 / (np.pi * T2STAR_S))
 max_ramsey_freq_hz = max(first_attempt_peaks) + 2 / (np.pi * T2STAR_S)
 ramsey_freq_range_constrained_hz = np.linspace(min_ramsey_freq_hz, max_ramsey_freq_hz, N_RAMSEY_POINTS)
 cos_cos_inner_prod = double_cosine_inner_product_vs_ramsey(
     sq_cancelled_signal, rabi_frequencies[EXAMPLE_ORIENTATION], ramsey_freq_range_constrained_hz, inner_product_settings
 )
-fit_result = fit_constrained_hyperfine_peaks(
+peakfit_result = fit_constrained_hyperfine_peaks(
     ramsey_freq_range_constrained_hz, cos_cos_inner_prod, T2STAR_S, constrain_same_width=True,allow_zero_peak=True
 )
 
-fig = plt.figure(0,(5,3))
-
+# Plot the frequency domain signal and fit
+fig = plt.figure(0,(5,1))
 renormalization =np.abs(min(cos_cos_inner_prod_init))
-
 plt.plot(HZ_TO_MHZ * RAMSEY_FREQ_RANGE_INITIAL_GUESS_HZ, cos_cos_inner_prod_init/renormalization, label="inner product")
-plt.plot(HZ_TO_MHZ * ramsey_freq_range_constrained_hz, fit_result.best_fit/renormalization, label="fit")
+plt.plot(HZ_TO_MHZ * ramsey_freq_range_constrained_hz, peakfit_result.best_fit/renormalization, label="fit")
 plt.xlabel("Inner product Ramsey frequency (MHz)")
 plt.ylabel("Double cosine inner product (a.u.)")
 plt.legend()
@@ -139,72 +160,48 @@ plt.legend()
 plt.title(
     f"B field: {np.array2string(T_TO_UT * np.array(b_field_vector_t), precision=1)} uT, Axis: {np.array2string(np.sqrt(3) * NVaxes_100[EXAMPLE_ORIENTATION], precision=0)}, Rabi: {rabi_frequencies[EXAMPLE_ORIENTATION] * 1e-6:.1f} MHz" #\nErrors: {np.array2string(errors_nT, precision=2)} nT"
 )
-plt.tight_layout()
-plt.savefig("example_fit.svg")
+plt.xlim(0, 8.5)
+plt.gca().xaxis.set_ticks_position("both")
+plt.gca().yaxis.set_ticks_position("both")
+plt.gca().minorticks_on()
+plt.gca().tick_params(direction="in", which = "both", width=1.5)
+plt.gca().tick_params(direction="in", which = "minor", length=2.5)
+plt.gca().tick_params(direction="in", which = "major", length=5)
+plt.gca().xaxis.set_major_locator(MultipleLocator(2))
+plt.savefig(base_path+"example_fit.svg")
 plt.show()
 
 larmor_freqs_all_axes_hz, _ = get_true_eigenvalues(exp_param_factory.get_experiment_parameters())
-errors_nT = fit_vs_eigenvalue_error_nT(fit_result, larmor_freqs_all_axes_hz[EXAMPLE_ORIENTATION])
-print(f"Fit errors: {np.array2string(errors_nT, precision=2)}")
+errors_nT = fit_vs_eigenvalue_error_nT(peakfit_result, larmor_freqs_all_axes_hz[EXAMPLE_ORIENTATION])
+print(f"Peak fit errors: {np.array2string(errors_nT, precision=2)}")
 
+########################################################
+# Calculate and plot the time domain inversion for the same data set
 
-# Plot pre-generated data on accuracy at 50 uT. Generated using simulate_and_invert_vs_b_angle.py" with the following settings:
-# MW_DIRECTION = np.array([0.20539827217056314, 0.11882075246379901, 0.9714387158093318]) 
-# E_FIELD_VECTOR_V_PER_CM = 0 * np.array([1e5, 3e5, 0]) / exy
-# B_MAGNITUDE_T = 50e-6
-# RABI_FREQ_BASE_HZ = 100e6
-# DETUNING_HZ = 0e6
-# MW_PULSE_LENGTH_S = np.arange(0, 400e-9, 2.5e-9)  
-# EVOLUTION_TIME_S = np.arange(0, 5e-6, 20e-9) 
-# T2STAR_S = 2e-6
-# N_RAMSEY_POINTS = 251
-# RAMSEY_FREQ_RANGE_INITIAL_GUESS_HZ = np.linspace(0, 10e6, N_RAMSEY_POINTS)
-# In InnerProductSettings:  rabi_window="blackman", ramsey_window="boxcar", subtract_mean=True, use_effective_rabi_frequency=True
-# In double_cosine_inner_product_inversion: constrain_same_width=True, allow_zero_peak=True
+freq_guesses = extract_fit_centers(peakfit_result)
+off_axis_experiment_parameters=exp_param_factory.get_experiment_parameters()
+mw_pulse_length_s = off_axis_experiment_parameters.mw_pulse_length_s
+evolution_time_s = off_axis_experiment_parameters.evolution_time_s
+rabi_window = windows.get_window(inner_product_settings.rabi_window, len(mw_pulse_length_s))
 
-def half_hyperfine(theta, phi):
-    return (-np.cos(theta)-np.cos(phi)*np.sin(theta) + np.sin(theta)*np.sin(phi))/np.sqrt(3) - f_h/(2*B_MAGNITUDE_T*gammab)
+time_domain_ramsey_signal = inner_product_sinusoid(np.cos, rabi_frequencies[EXAMPLE_ORIENTATION], mw_pulse_length_s, rabi_window*np.transpose(sq_cancelled_signal),axis=1)
+plt.figure(0,(5,2.5))
+plt.plot(1e6*evolution_time_s, time_domain_ramsey_signal, marker="o", linestyle="", label="simulation")
 
-theta_hh_rad = np.array([fsolve(half_hyperfine, [2.5], (phi))[0] for phi in PHI_RANGE_HALF_HYPERFINE])
-theta_hh_rad_low = np.array([fsolve(half_hyperfine, [1.5], (phi))[0] for phi in PHI_RANGE_HALF_HYPERFINE])
-
-errors_vs_b_nT=np.loadtxt("errors_vs_b_nt.txt")
-phi_values=np.loadtxt("phi_values.txt")
-theta_values=np.loadtxt("theta_values.txt")
-
-errors_vs_b_nT_fine=np.loadtxt("errors_nt_b_50_ut_t2s_2.000000_us.txt")
-phi_values_fine=np.loadtxt("phi_values_b_50_ut_t2s_2.000000_us.txt")
-theta_values_fine=np.loadtxt("theta_values_b_50_ut_t2s_2.000000_us.txt")
-
-errors_vs_b_nT_fine2=np.loadtxt("errors_nt_b_50_ut_t2s_2.000000_us_interleaved.txt")
-phi_values_fine2=np.loadtxt("phi_values_b_50_ut_t2s_2.000000_us_interleaved.txt")
-theta_values_fine2=np.loadtxt("theta_values_b_50_ut_t2s_2.000000_us_interleaved.txt")
-
-errors_vs_b_nT_total=np.concatenate((errors_vs_b_nT, errors_vs_b_nT_fine,errors_vs_b_nT_fine2))
-phi_values_total = np.concatenate((phi_values, phi_values_fine,phi_values_fine2))
-theta_values_total = np.concatenate((theta_values, theta_values_fine,theta_values_fine2))
-
-for i,EXAMPLE_ORIENTATION in enumerate(NVOrientation):
-    plt.subplot(2,2,i+1)
-    plt.tripcolor(np.array(phi_values_total)*RAD_TO_DEGREE, np.array(theta_values_total)*RAD_TO_DEGREE, np.abs(np.array(errors_vs_b_nT_total)[:,EXAMPLE_ORIENTATION]),cmap="inferno", norm="log", vmin=.01, vmax=300)
-    plt.colorbar()
-    plt.xlabel("Azimuthal angle (deg)")
-    plt.ylabel("Polar angle (deg)")
-    plt.title(
-        f"Axis: {np.array2string(np.sqrt(3) * NVaxes_100[EXAMPLE_ORIENTATION], precision=0)}, Rabi: {rabi_frequencies[EXAMPLE_ORIENTATION] * 1e-6:.1f} MHz", fontsize=10
-    )
-    if i==0:
-        plt.vlines([155, 290], [90], [180])
-        plt.hlines([90, 180],[155], [290])
-    if i==1:
-        phi_range_full = np.linspace(0, 2*np.pi, 101)
-        theta_no_projection = np.atan2(1, np.sin(phi_range_full) - np.cos(phi_range_full))
-        plt.plot(phi_range_full*RAD_TO_DEGREE, theta_no_projection * RAD_TO_DEGREE, color="white", linestyle="dashdot")
-
-        plt.plot(PHI_RANGE_HALF_HYPERFINE*RAD_TO_DEGREE, theta_hh_rad*RAD_TO_DEGREE, color="white", linestyle="dashed")
-        plt.plot(PHI_RANGE_HALF_HYPERFINE*RAD_TO_DEGREE, theta_hh_rad_low*RAD_TO_DEGREE, color="white", linestyle="dashed")
-
-plt.suptitle("Inversion error (nT) for |B| = 50 uT")
-plt.tight_layout()
-plt.savefig("accuracy50uT.svg")
+time_domain_result = fit_three_cos_model(evolution_time_s, time_domain_ramsey_signal, freq_guesses, T2STAR_S, False, True,True)
+plt.plot(1e6*evolution_time_s, time_domain_result.best_fit, label="fit")
+plt.gca().yaxis.set_ticks_position("both")
+plt.gca().xaxis.set_ticks_position("both")
+plt.gca().minorticks_on()
+plt.gca().tick_params(direction="in", which = "both", width=1.5)
+plt.gca().tick_params(direction="in", which = "minor", length=2.5)
+plt.gca().tick_params(direction="in", which = "major", length=5)
+plt.legend(loc="lower right")
+plt.xlabel("Free evolution time (us)")
+plt.ylabel("Inner-product-selected Ramsey signal (a.u.)")
+plt.ylim((0.02, 0.07))
+plt.savefig(base_path + "time_domain_fit.svg")
 plt.show()
+
+errors_nT = fit_vs_eigenvalue_error_nT(time_domain_result, larmor_freqs_all_axes_hz[EXAMPLE_ORIENTATION])
+print(f"Time domain fit errors: {np.array2string(errors_nT, precision=2)}")

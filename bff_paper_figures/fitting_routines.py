@@ -22,14 +22,15 @@ def lorentzian(x: float, freq: float, fwhm: float, amplitude: float) -> float:
 def decaying_cosine(x: float, freq: float, decay_time: float, amplitude: float, phase: float) -> float:
     return amplitude * np.exp(-x/decay_time)*np.cos(2*np.pi*freq*x + phase)
 
-def set_up_three_cos_model(signal_amplitude: float, freq_guesses:NDArray, t2star_s:float, fix_phase_to_zero=False, constrain_same_decay=False, constrain_hyperfine_freqs=False):
+def set_up_three_cos_model(time_domain_ramsey_signal:NDArray, freq_guesses:NDArray, t2star_s:float, fix_phase_to_zero=False, constrain_same_decay=False, constrain_hyperfine_freqs=False):
+    signal_amplitude = (max(time_domain_ramsey_signal) - min(time_domain_ramsey_signal))/2
     model = Model(offset)
     for i in range(N_HYPERFINE):
         model += Model(decaying_cosine, prefix=f"p{i}_")
     params = model.make_params()
-    params["offset_value"].value = 0
+    params["offset_value"].value = np.mean(time_domain_ramsey_signal)
     for i in range(N_HYPERFINE):
-        params[f"p{i}_amplitude"].value =  signal_amplitude/N_HYPERFINE
+        params[f"p{i}_amplitude"].value =  -signal_amplitude/N_HYPERFINE
         params[f"p{i}_phase"].value = 0
         params[f"p{i}_decay_time"].value = t2star_s/2
         params[f"p{i}_freq"].value = freq_guesses[i]
@@ -43,8 +44,7 @@ def set_up_three_cos_model(signal_amplitude: float, freq_guesses:NDArray, t2star
     return model, params
 
 def fit_three_cos_model(evolution_times_s:NDArray, time_domain_ramsey_signal: NDArray, freq_guesses:NDArray, t2star_s:float, fix_phase_to_zero:bool=False, constrain_same_decay:bool=False, constrain_hyperfine_freqs:bool=False):
-    signal_amp = (max(time_domain_ramsey_signal) - min(time_domain_ramsey_signal))/2
-    model, params = set_up_three_cos_model(signal_amp, freq_guesses, t2star_s, fix_phase_to_zero=fix_phase_to_zero, constrain_same_decay=constrain_same_decay, constrain_hyperfine_freqs=constrain_hyperfine_freqs)
+    model, params = set_up_three_cos_model(time_domain_ramsey_signal, freq_guesses, t2star_s, fix_phase_to_zero=fix_phase_to_zero, constrain_same_decay=constrain_same_decay, constrain_hyperfine_freqs=constrain_hyperfine_freqs)
     time_domain_result = model.fit(time_domain_ramsey_signal, params, x=evolution_times_s)
     return time_domain_result
 
