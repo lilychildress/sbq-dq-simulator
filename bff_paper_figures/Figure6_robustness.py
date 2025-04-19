@@ -16,6 +16,7 @@ BASE_PATH = "/Users/lilianchildress/Documents/GitHub/sbq-dq-simulator/bff_paper_
 # for the inversion)
 RABI_MAX_RANGE = np.linspace(50e6, 150e6, 201)
 RUN_LABEL = f"rabi_{min(RABI_MAX_RANGE)*1e-6:.02f}_to_{max(RABI_MAX_RANGE)*1e-6:.02f}_mhz"
+
 errors_freq_nT = list(np.loadtxt(BASE_PATH+f"errors_nt_freq_{RUN_LABEL}.txt"))
 errors_time_nT = list(np.loadtxt(BASE_PATH+f"errors_nt_time_{RUN_LABEL}.txt", ))
 rabi_maxes = list(np.loadtxt(BASE_PATH+f"rabi_values_{RUN_LABEL}.txt"))
@@ -39,7 +40,7 @@ for spine in plt.gca().spines.values():
     spine.set_linewidth(1.25)
 plt.ylim((-2, 2))
 plt.tight_layout()
-plt.savefig("robustness_vs_mw_mag.svg")
+plt.savefig(BASE_PATH+"robustness_vs_mw_mag.svg")
 plt.show()
 
 ##########################################################################
@@ -65,7 +66,7 @@ vmin= 0.01
 vmax = 10
 
 labels = [r"$\langle111\rangle$", r"$\langle1\bar{1}1\rangle$", r"$\langle11\bar{1}\rangle$", r"$\langle\bar{1}11\rangle$"]
-positions = [[21, 3.5],[35, 3.5],[21, 3.5], [35, 3.5]]
+positions = [[21, 4.5],[35, 4.5],[21, 4.5], [35, 4.5]]
 
 plt.rcParams['font.size'] = 9
 plt.rcParams['font.family'] = 'arial'
@@ -91,9 +92,10 @@ for i, ax in enumerate(axes.flat):
         spine.set_linewidth(1.25)
     if i>0:
         # Find the angles at which the 3/2 harmonic of the <111> orientation intersects the rabi frequency of this orientation
-        theta_crosstalk_rad = [fsolve(rabi_difference_to_crosstalk_harmonic, [.5], (phi, 0, 1.5, i))[0] for phi in phi_crosstalk_rad]
-        ax.plot(np.array(phi_crosstalk_rad)*RAD_TO_DEGREE, np.array(theta_crosstalk_rad)*RAD_TO_DEGREE, color="red")
-        ax.set_ylim([min(mw_theta_values)*RAD_TO_DEGREE, max(mw_theta_values)*RAD_TO_DEGREE])
+        theta_crosstalk_rad = np.array([fsolve(rabi_difference_to_crosstalk_harmonic, [.5], (phi, 0, 1.5, i))[0] for phi in phi_crosstalk_rad])
+        mask = theta_crosstalk_rad < max(mw_theta_values)
+        ax.plot(np.array(phi_crosstalk_rad)[mask]*RAD_TO_DEGREE, theta_crosstalk_rad[mask]*RAD_TO_DEGREE, color="red")
+        
 plt.subplots_adjust(wspace=0.05, hspace=0.05)
 plt.subplots_adjust(top=0.8, right=.99, left=0.14, bottom=0.12)
 
@@ -102,5 +104,5 @@ cbar =fig.colorbar(im, cax=cbar_ax, orientation="horizontal")
 cbar.set_label("Inversion error (nT)", fontsize=9)
 cbar.ax.xaxis.set_label_position('top')
 cbar.ax.xaxis.set_ticks_position('top')
-plt.savefig("robustness_vs_mw_angle.svg")
+plt.savefig(BASE_PATH+"robustness_vs_mw_angle.png", dpi=2000)
 plt.show()
