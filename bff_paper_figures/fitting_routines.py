@@ -55,6 +55,7 @@ def set_up_three_peak_model(
     t2star_s: float,
     constrain_same_width: bool = True,
     allow_zero_peak: bool = True,
+    constrain_hyperfine_splittings: bool = True,
 ) -> tuple:
     
     three_peak_model = Model(offset) + Model(lorentzian, prefix="zero_")
@@ -69,7 +70,10 @@ def set_up_three_peak_model(
             params[f"p{i}_freq"].value = rightmost_peak_location
             params[f"p{i}_fwhm"].value = 2 / (np.pi * t2star_s)
         else:
-            params[f"p{i}_freq"].expr = f"abs(p0_freq - 2*{i}*{f_h})"
+            if constrain_hyperfine_splittings:
+                params[f"p{i}_freq"].expr = f"abs(p0_freq - 2*{i}*{f_h})"
+            else:
+                params[f"p{i}_freq"].value = rightmost_peak_location - 2*i*f_h
             if constrain_same_width:
                 params[f"p{i}_fwhm"].expr = f"p0_fwhm"
             else:
@@ -86,7 +90,8 @@ def set_up_three_peak_model(
     params["zero_freq"].vary = False
     return three_peak_model, params
 
-
+# Fits the double inner product (as a function of ramsey frequency) to three Lorentzians. The firt two arguments
+# are the x (ramsey frequency) and y (inner product) data vectors. 
 def fit_constrained_hyperfine_peaks(
     ramsey_freqs_range_hz: NDArray,
     double_inner_product_cos_cos: NDArray,
@@ -95,6 +100,7 @@ def fit_constrained_hyperfine_peaks(
     prominence_factor: float = 1 / 3,
     constrain_same_width: bool = True,
     allow_zero_peak: bool = True,
+    constrain_hyperfine_splittings: bool = True,
 ) -> ModelResult:
     max_inner_product = max(double_inner_product_cos_cos)
     min_inner_product = min(double_inner_product_cos_cos)
@@ -107,7 +113,7 @@ def fit_constrained_hyperfine_peaks(
     rightmost_peak_location = ramsey_freqs_range_hz[peaks[0][-1]]
 
     three_peak_model, params = set_up_three_peak_model(
-        max_inner_product, min_inner_product, rightmost_peak_location, t2star_s, constrain_same_width, allow_zero_peak
+        max_inner_product, min_inner_product, rightmost_peak_location, t2star_s, constrain_same_width, allow_zero_peak, constrain_hyperfine_splittings,
     )
 
     result = three_peak_model.fit(double_inner_product_cos_cos, params, x=ramsey_freqs_range_hz)

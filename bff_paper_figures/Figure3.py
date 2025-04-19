@@ -2,10 +2,12 @@ from matplotlib import pyplot as plt
 from matplotlib.colors import TABLEAU_COLORS
 import numpy as np
 from bff_paper_figures.imshow_extensions import imshow_with_extents_and_crop
+from bff_paper_figures.simulate_and_invert_helper_functions import sq_cancelled_signal_generator
+from bff_paper_figures.extract_experiment_values import get_ideal_rabi_frequencies
 
 from bff_simulator.abstract_classes.abstract_ensemble import NV14HyperfineField, NVOrientation
 from bff_simulator.constants import exy, NVaxes_100, gammab
-from bff_simulator.homogeneous_ensemble import HomogeneousEnsemble
+from bff_simulator.homogeneous_ensemble import HomogeneousEnsemble, NVOrientation
 from bff_simulator.liouvillian_solver import LiouvillianSolver
 from bff_simulator.offaxis_field_experiment_parameters import OffAxisFieldExperimentParametersFactory
 from bff_simulator.simulator import Simulation
@@ -23,12 +25,10 @@ EVOLUTION_TIME_S = np.linspace(0, 15e-6, 1001)
 T2STAR_S = 2e-6
 
 def main()-> None:
-    rabi_frequencies = [RABI_FREQ_BASE_HZ * perpendicular_projection(MW_DIRECTION, NVaxis) for NVaxis in NVaxes_100]
 
     nv_ensemble = HomogeneousEnsemble()
     nv_ensemble.efield_splitting_hz = np.linalg.norm(E_FIELD_VECTOR_V_PER_CM) * exy
     nv_ensemble.t2_star_s = T2STAR_S
-    # nv_ensemble.add_nv_single_species(NVOrientation.A, NV14HyperfineField.N14_0)
     nv_ensemble.add_full_diamond_populations()
     nv_ensemble.mw_direction = MW_DIRECTION
 
@@ -41,31 +41,21 @@ def main()-> None:
     exp_param_factory.set_second_pulse_phase(0)
     exp_param_factory.set_mw_pulse_lengths(MW_PULSE_LENGTH_S)
     exp_param_factory.set_evolution_times(EVOLUTION_TIME_S)
-    off_axis_experiment_parameters = exp_param_factory.get_experiment_parameters()
 
     off_axis_solver = LiouvillianSolver()
 
-    off_axis_simulation_0_phase = Simulation(off_axis_experiment_parameters, nv_ensemble, off_axis_solver)
+    sq_cancelled_signal = sq_cancelled_signal_generator(exp_param_factory, nv_ensemble, off_axis_solver)
 
-    exp_param_factory.set_second_pulse_phase(np.pi)
-    off_axis_experiment_parameters = exp_param_factory.get_experiment_parameters()
-    off_axis_simulation_pi_phase = Simulation(off_axis_experiment_parameters, nv_ensemble, off_axis_solver)
-
-    # imshow_with_extents( EVOLUTION_TIME_S,MW_PULSE_LENGTH_S, off_axis_simulation_0_phase.ms0_results, aspect_ratio=1)
-    # plt.show()
-
-    # fourier_transform_0_phase = np.fft.fft2(off_axis_simulation_0_phase.ms0_results)
-    # fourier_transform_0_phase = np.fft.fftshift(fourier_transform_0_phase)
+    # Calculate the frequency axes for the 2D FFT
     rabifreqs = np.sort(np.fft.fftfreq(len(MW_PULSE_LENGTH_S), MW_PULSE_LENGTH_S[1] - MW_PULSE_LENGTH_S[0]))
     ramseyfreqs = np.sort(np.fft.fftfreq(len(EVOLUTION_TIME_S), EVOLUTION_TIME_S[1] - EVOLUTION_TIME_S[0]))
-    ramsey_max = 30e6  # 3*np.linalg.norm(np.array(B_FIELD_VECTOR_T)*gammab) + 2*2.16e6
+    
+    # Set the display plotting limits
+    ramsey_max = 30e6 
     rabi_max = RABI_FREQ_BASE_HZ * 2
-    # imshow_with_extents_and_crop(ramseyfreqs,rabifreqs, abs(fourier_transform_0_phase), ymin=0, ymax=rabi_max, xmin=0, xmax=ramsey_max, vmax=250)
-    # plt.show()
 
-    fourier_transform_sq_subtracted = np.fft.fft2(
-        off_axis_simulation_0_phase.ms0_results + off_axis_simulation_pi_phase.ms0_results
-    )
+    # Calculate the FFT of the single-quantum-cancelled signal
+    fourier_transform_sq_subtracted = np.fft.fft2(sq_cancelled_signal)
     fourier_transform_sq_subtracted = np.fft.fftshift(fourier_transform_sq_subtracted)
     imshow_with_extents_and_crop(
         ramseyfreqs,
@@ -79,10 +69,10 @@ def main()-> None:
     )
     plt.colorbar()
 
-    colors = list(TABLEAU_COLORS.keys())[:4]
-
-    print(B_FIELD_VECTOR_T)
-    for i in range(4):
+    # Plot the rabi frequencies for each orientation on top of the FFT
+    rabi_frequencies = get_ideal_rabi_frequencies(exp_param_factory.get_experiment_parameters())
+    colors = list(TABLEAU_COLORS.keys())[:len(NVOrientation)]
+    for i in range(len(NVOrientation)):
         for j in [0.5, 1, 1.5, 2]:
             plt.plot(
                 [12e6 if i != 0 else 25e6, ramsey_max], [j * rabi_frequencies[i], j * rabi_frequencies[i]], color=colors[i]

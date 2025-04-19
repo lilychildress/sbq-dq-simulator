@@ -10,10 +10,11 @@ from bff_simulator.offaxis_field_experiment_parameters import OffAxisFieldExperi
 from bff_paper_figures.simulate_and_invert_helper_functions import (
     sq_cancelled_signal_generator,
     double_cosine_inner_product_fit_inversion,
-    time_domain_fit_inversion
+    time_domain_fit_inversion, 
+    angles_already_evaluated
 )
 from bff_paper_figures.inner_product_functions import InnerProductSettings
-from bff_paper_figures.extract_experiment_values import get_bare_rabi_frequencies, get_true_eigenvalues
+from bff_paper_figures.extract_experiment_values import get_ideal_rabi_frequencies, get_true_eigenvalues
 from bff_paper_figures.fitting_routines import fit_vs_eigenvalue_error_all_orientations_nT, extract_fit_centers_all_orientations
 
 T_TO_UT = 1e6
@@ -42,14 +43,9 @@ T2STAR_S = 2e-6
 N_RAMSEY_POINTS = 251
 RAMSEY_FREQ_RANGE_INITIAL_GUESS_HZ = np.linspace(0, 10e6, N_RAMSEY_POINTS)
 
-PEAK_INDEX = 0 # Which frequency we will be comparing to expected value; 0 is highest-frequency peak
+PEAK_INDEX = 0 # Which extracted eigenfrequency we will be comparing to expected value; 0 is highest-frequency peak
 
 RUN_LABEL = f"b_{B_MAGNITUDE_T*T_TO_UT:.0f}_ut_t2s_{T2STAR_S*1e6:.0f}_us_fine_3us_ramsey_800ns_rabi"
-
-def angles_already_evaluated(test_theta, test_phi, theta_values, phi_values):
-    theta_indices = np.where(np.isclose(theta_values, test_theta))
-    phi_indices = np.where(np.isclose(phi_values, test_phi))
-    return len(np.intersect1d(theta_indices, phi_indices)) > 0
 
 nv_ensemble = HomogeneousEnsemble()
 nv_ensemble.efield_splitting_hz = np.linalg.norm(E_FIELD_VECTOR_V_PER_CM) * exy
@@ -76,18 +72,18 @@ inner_product_settings = InnerProductSettings(
     use_effective_rabi_frequency=True,
 )
  
-rabi_frequencies = get_bare_rabi_frequencies(exp_param_factory.get_experiment_parameters())
+ideal_rabi_frequencies = get_ideal_rabi_frequencies(exp_param_factory.get_experiment_parameters())
 
 theta_values = []
 phi_values = []
 errors_vs_b_freq_domain_nT = []
 errors_vs_b_time_domain_nT = []
 
-
-errors_vs_b_freq_domain_nT = list(np.loadtxt(f"errors_nt_freq_{RUN_LABEL}.txt"))
-errors_vs_b_time_domain_nT = list(np.loadtxt(f"errors_nt_time_{RUN_LABEL}.txt", ))
-phi_values = list(np.loadtxt(f"phi_values_{RUN_LABEL}.txt"))
-theta_values = list(np.loadtxt(f"theta_values_{RUN_LABEL}.txt"))
+# Optinally load a partially completed simulation
+#errors_vs_b_freq_domain_nT = list(np.loadtxt(f"errors_nt_freq_{RUN_LABEL}.txt"))
+#errors_vs_b_time_domain_nT = list(np.loadtxt(f"errors_nt_time_{RUN_LABEL}.txt", ))
+#phi_values = list(np.loadtxt(f"phi_values_{RUN_LABEL}.txt"))
+#theta_values = list(np.loadtxt(f"theta_values_{RUN_LABEL}.txt"))
 
 problem_theta_values = []
 problem_phi_values = []
@@ -101,12 +97,12 @@ for theta in np.linspace(B_THETA_START, B_THETA_STOP, B_THETA_N):
             sq_cancelled_signal = sq_cancelled_signal_generator(exp_param_factory, nv_ensemble, off_axis_solver)
 
             larmor_freqs_all_axes_hz, bz_values_all_axes_t = get_true_eigenvalues(exp_param_factory.get_experiment_parameters())
-
+            ideal_rabi_frequencies = get_ideal_rabi_frequencies(exp_param_factory.get_experiment_parameters())
             try:    
                 # frequency domain inversion
                 peakfit_results = double_cosine_inner_product_fit_inversion(
                     sq_cancelled_signal,
-                    exp_param_factory.get_experiment_parameters(),
+                    ideal_rabi_frequencies,
                     inner_product_settings,
                     RAMSEY_FREQ_RANGE_INITIAL_GUESS_HZ,
                     T2STAR_S,
@@ -116,17 +112,18 @@ for theta in np.linspace(B_THETA_START, B_THETA_STOP, B_THETA_N):
                 errors_fd_nT = fit_vs_eigenvalue_error_all_orientations_nT(peakfit_results, larmor_freqs_all_axes_hz)
                 print(f"theta = {theta:.2f}, phi = {phi:.2f}, freq domain errors = {np.array2string(errors_fd_nT[:, PEAK_INDEX], precision=2)} nT") 
 
-                # time domain inversion
+                # time domain inversion using the ideal rabi frequencies and initial guesses from frequency domain inversion
                 freq_guesses_all_orientations = extract_fit_centers_all_orientations(peakfit_results)
                 time_domain_fit_results = time_domain_fit_inversion(
                     sq_cancelled_signal, 
-                    exp_param_factory.get_experiment_parameters(), 
+                    ideal_rabi_frequencies, 
                     inner_product_settings, 
                     freq_guesses_all_orientations, 
                     T2STAR_S,
                     fix_phase_to_zero= False,
                     constrain_same_decay= True,
-                    constrain_hyperfine_freqs= True)
+                    constrain_hyperfine_freqs= True,
+                    )
                 errors_td_nT = fit_vs_eigenvalue_error_all_orientations_nT(time_domain_fit_results, larmor_freqs_all_axes_hz)
                 print(f"\t \t \t time domain fit errors = {np.array2string(errors_td_nT[:, PEAK_INDEX], precision=3)} nT")
                 
@@ -153,7 +150,7 @@ for i,orientation in enumerate(NVOrientation):
     plt.xlabel("Azimuthal angle (deg)")
     plt.ylabel("Polar angle (deg)")
     plt.title(
-        f"Axis: {np.array2string(np.sqrt(3) * NVaxes_100[orientation], precision=0)}, Rabi: {rabi_frequencies[orientation] * 1e-6:.1f} MHz", fontsize=10
+        f"Axis: {np.array2string(np.sqrt(3) * NVaxes_100[orientation], precision=0)}, Rabi: {ideal_rabi_frequencies[orientation] * 1e-6:.1f} MHz", fontsize=10
     )
 plt.suptitle(f"Inversion error (nT) for |B| = {B_MAGNITUDE_T *T_TO_UT} uT")
 plt.tight_layout()
@@ -166,7 +163,7 @@ for i,orientation in enumerate(NVOrientation):
     plt.xlabel("Azimuthal angle (deg)")
     plt.ylabel("Polar angle (deg)")
     plt.title(
-        f"Axis: {np.array2string(np.sqrt(3) * NVaxes_100[orientation], precision=0)}, Rabi: {rabi_frequencies[orientation] * 1e-6:.1f} MHz", fontsize=10
+        f"Axis: {np.array2string(np.sqrt(3) * NVaxes_100[orientation], precision=0)}, Rabi: {ideal_rabi_frequencies[orientation] * 1e-6:.1f} MHz", fontsize=10
     )
 plt.suptitle(f"Inversion error (nT) for |B| = {B_MAGNITUDE_T *T_TO_UT} uT")
 plt.tight_layout()

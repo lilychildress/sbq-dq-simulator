@@ -11,7 +11,7 @@ from bff_simulator.liouvillian_solver import LiouvillianSolver
 from bff_simulator.abstract_classes.abstract_ensemble import NVOrientation
 from bff_simulator.offaxis_field_experiment_parameters import OffAxisFieldExperimentParametersFactory
 from bff_paper_figures.simulate_and_invert_helper_functions import sq_cancelled_signal_generator
-from bff_paper_figures.extract_experiment_values import get_bare_rabi_frequencies, get_true_eigenvalues
+from bff_paper_figures.extract_experiment_values import get_ideal_rabi_frequencies, get_true_eigenvalues
 from bff_paper_figures.fitting_routines import fit_vs_eigenvalue_error_nT
 from bff_paper_figures.imshow_extensions import imshow_with_extents_and_crop
 from bff_paper_figures.inner_product_functions import InnerProductSettings, double_cosine_inner_product_vs_ramsey
@@ -38,8 +38,8 @@ B_PHI = 13*np.pi/16
 RABI_FREQ_BASE_HZ = 100e6
 DETUNING_HZ = 0e6
 SECOND_PULSE_PHASE = 0
-MW_PULSE_LENGTH_S = np.arange(0, 400e-9, 2.5e-9)  # np.linspace(0, 0.5e-6, 1001)
-EVOLUTION_TIME_S = np.arange(0, 3e-6, 10e-9)  # p.linspace(0, 15e-6, 801)
+MW_PULSE_LENGTH_S = np.arange(0, 400e-9, 2.5e-9)  
+EVOLUTION_TIME_S = np.arange(0, 3e-6, 10e-9)  
 T2STAR_S = 2e-6
 N_RAMSEY_POINTS = 251
 RAMSEY_FREQ_RANGE_INITIAL_GUESS_HZ = np.linspace(0, 8.5e6, N_RAMSEY_POINTS)
@@ -49,7 +49,7 @@ PHI_RANGE_HALF_HYPERFINE = np.linspace(1.4607, 3.25133, 301)
 
 EXAMPLE_ORIENTATION = 3 # Orientation index that we will analyze in detail
 
-base_path = "/Users/lilianchildress/Documents/GitHub/sbq-dq-simulator/bff_paper_figures/data/"
+BASE_PATH = "/Users/lilianchildress/Documents/GitHub/sbq-dq-simulator/bff_paper_figures/data/"
 
 # Set up the simulation
 nv_ensemble = HomogeneousEnsemble()
@@ -73,10 +73,10 @@ exp_param_factory.set_b_field_vector(b_field_vector_t)
 sq_cancelled_signal = sq_cancelled_signal_generator(exp_param_factory, nv_ensemble, off_axis_solver)
 
 # Extract the rabi frequency for each orientation for the MW_DIRECTION set in the experiment parameters
-rabi_frequencies = get_bare_rabi_frequencies(exp_param_factory.get_experiment_parameters())
+rabi_frequencies = get_ideal_rabi_frequencies(exp_param_factory.get_experiment_parameters())
 
 ###################################################################
-# Plot the double inner product over rabifreqs, ramseyfreqs range
+# Plot the double inner product (discrete time fourier transform) over rabifreqs, ramseyfreqs range
 rabifreqs = np.linspace(60e6, 100e6, 201)
 ramseyfreqs = np.linspace(0, 8.5e6, 251)
 
@@ -99,16 +99,16 @@ plt.gca().minorticks_on()
 plt.gca().tick_params(direction="in", which = "both", width=1.5)
 plt.gca().tick_params(direction="in", which = "minor", length=2.5)
 plt.gca().tick_params(direction="in", which = "major", length=5)
-plt.savefig(base_path+"double_inner_product.svg")
+plt.savefig(BASE_PATH+"double_inner_product.svg")
 plt.show()
 
 #############################################################
 # Plot the associated filter function for boxcar and blackman
-fake_signal = np.cos(2*np.pi*np.sqrt(rabi_frequencies[3]**2 +max(ramseyfreqs)**2)*MW_PULSE_LENGTH_S)
+ideal_signal = np.cos(2*np.pi*np.sqrt(rabi_frequencies[3]**2 +max(ramseyfreqs)**2)*MW_PULSE_LENGTH_S)
 blackman_window = windows.get_window("blackman", len(MW_PULSE_LENGTH_S))
 
-boxcar_filter_function=np.array([inner_product_sinusoid(np.cos, rabi_hz, MW_PULSE_LENGTH_S, fake_signal) for rabi_hz in rabifreqs])
-blackman_filter_function=np.array([inner_product_sinusoid(np.cos, rabi_hz, MW_PULSE_LENGTH_S, fake_signal*blackman_window) for rabi_hz in rabifreqs])
+boxcar_filter_function=np.array([inner_product_sinusoid(np.cos, rabi_hz, MW_PULSE_LENGTH_S, ideal_signal) for rabi_hz in rabifreqs])
+blackman_filter_function=np.array([inner_product_sinusoid(np.cos, rabi_hz, MW_PULSE_LENGTH_S, ideal_signal*blackman_window) for rabi_hz in rabifreqs])
 
 fig = plt.figure(0,(1,5))
 plt.plot(boxcar_filter_function,HZ_TO_MHZ*rabifreqs, label="Boxcar")
@@ -121,12 +121,13 @@ plt.gca().tick_params(direction="in", which = "both", width=1.5)
 plt.gca().tick_params(direction="in", which = "minor", length=2.5)
 plt.gca().tick_params(direction="in", which = "major", length=5)
 plt.legend(loc="lower left")
-plt.savefig(base_path+"filter_functions.svg")
+plt.savefig(BASE_PATH+"filter_functions.svg")
 plt.show()
 
 ##########################################################
 # Calculate and plot the frequency domain fit
-# Do the fit (first fit is to set the fitting range)
+
+# Do an initial fit (first fit is to set the fitting range)
 inner_product_settings.use_effective_rabi_frequency=True
 inner_product_settings.rabi_window="blackman"
 
@@ -168,7 +169,7 @@ plt.gca().tick_params(direction="in", which = "both", width=1.5)
 plt.gca().tick_params(direction="in", which = "minor", length=2.5)
 plt.gca().tick_params(direction="in", which = "major", length=5)
 plt.gca().xaxis.set_major_locator(MultipleLocator(2))
-plt.savefig(base_path+"example_fit.svg")
+plt.savefig(BASE_PATH+"example_fit.svg")
 plt.show()
 
 larmor_freqs_all_axes_hz, _ = get_true_eigenvalues(exp_param_factory.get_experiment_parameters())
@@ -200,7 +201,7 @@ plt.legend(loc="lower right")
 plt.xlabel("Free evolution time (us)")
 plt.ylabel("Inner-product-selected Ramsey signal (a.u.)")
 plt.ylim((0.02, 0.07))
-plt.savefig(base_path + "time_domain_fit.svg")
+plt.savefig(BASE_PATH + "time_domain_fit.svg")
 plt.show()
 
 errors_nT = fit_vs_eigenvalue_error_nT(time_domain_result, larmor_freqs_all_axes_hz[EXAMPLE_ORIENTATION])

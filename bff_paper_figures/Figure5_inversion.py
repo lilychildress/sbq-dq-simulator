@@ -10,9 +10,16 @@ from bff_simulator.abstract_classes.abstract_ensemble import NVOrientation
 
 
 RAD_TO_DEGREE = 360/(2*np.pi)
+T_TO_UT = 1e6
 PHI_RANGE_HALF_HYPERFINE = np.linspace(1.4607, 3.25133, 301)
 B_MAGNITUDE_T = 50e-6
 RABI_FREQUENCIES = [np.float64(66364423.69292802), np.float64(79174946.48739058), np.float64(92756072.06279232), np.float64(85965509.82093404)]
+
+B_THETA_FIG4 =  3*np.pi/8
+B_PHI_FIG4 = 13*np.pi/16
+
+BASE_PATH = "/Users/lilianchildress/Documents/GitHub/sbq-dq-simulator/bff_paper_figures/data/"
+RUN_LABEL = f"b_{1e6*B_MAGNITUDE_T:.0f}_ut_t2s_2_us_fine_3us_ramsey_800ns_rabi"
 
 def half_hyperfine(theta, phi):
     return (-np.cos(theta)-np.cos(phi)*np.sin(theta) + np.sin(theta)*np.sin(phi))/np.sqrt(3) - f_h/(2*B_MAGNITUDE_T*gammab)
@@ -31,14 +38,13 @@ def plot_errors_all_orientations(theta_values_total, phi_values_total, errors_vs
     
     theta_ranges = [[90,180],[90,180],[0,90],[0,90]]
     phi_ranges = [[155, 295], [155-90, 295-90],[155, 295], [155-90, 295-90]]
-    labels = ["<111>", "<11\u03041>", "<111\u0304>", "<1\u030411>"]
     labels = [r"$\langle111\rangle$", r"$\langle1\bar{1}1\rangle$", r"$\langle11\bar{1}\rangle$", r"$\langle\bar{1}11\rangle$"]
     rabis = [f"{1e-6*RABI_FREQUENCIES[i]:.0f} MHz" for i in range(4)]
     positions = [[2,4],[2,4],[2,155], [2, 155]]
     rabi_positions= [[245,4],[245,4],[245,155], [245, 155]]
     errors = [get_rms_error_within_range(theta_ranges[i], phi_ranges[i], np.array(phi_values_total), np.array(theta_values_total), np.array(errors_vs_b_nT_total), i) for i in range(4)]
     error_labels = [f"{errors[i]:.2f}\nnT-rms" for i in range(4)]
-    error_positions=[[185, 120], [85, 120], [185, 35], [85, 35]]
+    error_positions=[[185, 120], [85, 120], [185, 15], [85, 15]]
 
     plt.rcParams['font.size'] = 9
     plt.rcParams['font.family'] = 'arial'
@@ -47,6 +53,8 @@ def plot_errors_all_orientations(theta_values_total, phi_values_total, errors_vs
     fig.set_figwidth(3.4)
     for i, ax in enumerate(axes.flat):
         im=ax.tripcolor(np.array(phi_values_total)*RAD_TO_DEGREE, np.array(theta_values_total)*RAD_TO_DEGREE, np.abs(np.array(errors_vs_b_nT_total)[:,i]),cmap="inferno", norm=plotstyle, vmin=vmin, vmax=vmax)
+        if i == 3:
+            ax.scatter(B_PHI_FIG4*RAD_TO_DEGREE, B_THETA_FIG4*RAD_TO_DEGREE, marker="x", color="cyan")
         if i == 2 or i == 3:
             ax.set_xlabel("Azimuthal angle (deg.)", fontsize=9)
         if i==0 or i ==2:
@@ -63,9 +71,6 @@ def plot_errors_all_orientations(theta_values_total, phi_values_total, errors_vs
         ax.text(rabi_positions[i][0], rabi_positions[i][1], rabis[i], color="white", fontsize=8)
         ax.text(error_positions[i][0], error_positions[i][1], error_labels[i], color="white", fontsize=8)
         rms_error = get_rms_error_within_range(theta_ranges[i], phi_ranges[i], np.array(phi_values_total), np.array(theta_values_total), np.array(errors_vs_b_nT_total), i)
-        #ax.set_title(
-        #    f"Axis: {np.array2string(np.sqrt(3) * NVaxes_100[i], precision=0)}, Rabi: {RABI_FREQUENCIES[i] * 1e-6:.1f} MHz\nrms error ={rms_error:.3f} nT", fontsize=10
-        #)
         ax.vlines(phi_ranges[i], [theta_ranges[i][0]],[theta_ranges[i][1]], linestyle="dotted", color="white")
         ax.hlines(theta_ranges[i], [phi_ranges[i][0]], [phi_ranges[i][1]], linestyle="dotted", color="white")
 
@@ -77,26 +82,21 @@ def plot_errors_all_orientations(theta_values_total, phi_values_total, errors_vs
             if plot_half_hyperfine:
                 ax.plot(PHI_RANGE_HALF_HYPERFINE*RAD_TO_DEGREE, theta_hh_rad*RAD_TO_DEGREE, color="white", linestyle="dashed")
                 ax.plot(PHI_RANGE_HALF_HYPERFINE*RAD_TO_DEGREE, theta_hh_rad_low*RAD_TO_DEGREE, color="white", linestyle="dashed")
-    #cax,kw = colorbar.make_axes(axes, orientation="horizontal")
-    #fig.colorbar(im, cax=cax, **kw)
     plt.subplots_adjust(wspace=0.05, hspace=0.05)
     plt.subplots_adjust(top=0.8, right=.99, left=0.14, bottom=0.12)
-    #cbar_ax = fig.add_axes([.87, 0.15, 0.03, 0.7])
     cbar_ax = fig.add_axes([.25, 0.82, 0.65, 0.03])
     cbar =fig.colorbar(im, cax=cbar_ax, orientation="horizontal")
-    cbar.set_label("Inversion error (nT)", fontsize=9)
+    cbar.set_label(f"Inversion error (nT) at {T_TO_UT*B_MAGNITUDE_T:.0f} uT", fontsize=9)
     cbar.ax.xaxis.set_label_position('top')
     cbar.ax.xaxis.set_ticks_position('top')
-    #plt.tight_layout()
 
-base_path = "/Users/lilianchildress/Documents/GitHub/sbq-dq-simulator/bff_paper_figures/data/"
-RUN_LABEL = f"b_{1e6*B_MAGNITUDE_T:.0f}_ut_t2s_2_us_fine_3us_ramsey_800ns_rabi"
-errors_vs_b_freq_domain_nT = list(np.loadtxt(base_path+f"errors_nt_freq_{RUN_LABEL}.txt"))
-errors_vs_b_time_domain_nT = list(np.loadtxt(base_path+f"errors_nt_time_{RUN_LABEL}.txt", ))
-phi_values = list(np.loadtxt(base_path+f"phi_values_{RUN_LABEL}.txt"))
-theta_values = list(np.loadtxt(base_path+f"theta_values_{RUN_LABEL}.txt"))
+
+errors_vs_b_freq_domain_nT = list(np.loadtxt(BASE_PATH+f"errors_nt_freq_{RUN_LABEL}.txt"))
+errors_vs_b_time_domain_nT = list(np.loadtxt(BASE_PATH+f"errors_nt_time_{RUN_LABEL}.txt", ))
+phi_values = list(np.loadtxt(BASE_PATH+f"phi_values_{RUN_LABEL}.txt"))
+theta_values = list(np.loadtxt(BASE_PATH+f"theta_values_{RUN_LABEL}.txt"))
 #plot_errors_all_orientations(theta_values, phi_values, errors_vs_b_freq_domain_nT, True)
 #plt.show()
 plot_errors_all_orientations(theta_values, phi_values, errors_vs_b_time_domain_nT, False, True, vmin=0.01, vmax=10)
-plt.savefig(base_path+"time_domain_inversion.png", dpi=1000)
+plt.savefig(BASE_PATH+"time_domain_inversion.png", dpi=1000)
 plt.show()
