@@ -1,6 +1,7 @@
-from matplotlib import pyplot as plt
 import numpy as np
+from matplotlib import pyplot as plt
 from numpy.typing import NDArray
+
 
 def imshow_with_extents(xaxis, yaxis, data: NDArray, aspect_ratio: float = 1, vmin=None, vmax=None):
     if data.shape != (len(yaxis), len(xaxis)):
@@ -40,13 +41,13 @@ def imshow_with_extents_and_crop(
     vmax=None,
 ):
     small_quantity_to_ensure_no_cropping = 1
-    if xmin == None:
+    if xmin is None:
         xmin = min(xaxis) - small_quantity_to_ensure_no_cropping
-    if xmax == None:
+    if xmax is None:
         xmax = max(xaxis) + small_quantity_to_ensure_no_cropping
-    if ymin == None:
+    if ymin is None:
         ymin = min(yaxis) - small_quantity_to_ensure_no_cropping
-    if ymax == None:
+    if ymax is None:
         ymax = max(yaxis) + small_quantity_to_ensure_no_cropping
     x_mask = np.all(np.array([(xmin <= xaxis), xaxis <= xmax]), axis=0)
     y_mask = np.all(np.array([(ymin <= yaxis), yaxis <= ymax]), axis=0)

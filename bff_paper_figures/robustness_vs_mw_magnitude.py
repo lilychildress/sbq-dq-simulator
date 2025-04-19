@@ -1,22 +1,24 @@
 import numpy as np
-from math import floor
-from matplotlib import pyplot as plt
-from scipy.signal import find_peaks
-from scipy.optimize import minimize
 
-from bff_simulator.constants import exy, NVaxes_100, gammab
+from bff_paper_figures.extract_experiment_values import (
+    find_rabi_frequencies_from_signal,
+    get_ideal_rabi_frequencies,
+    get_true_eigenvalues,
+)
+from bff_paper_figures.fitting_routines import (
+    extract_fit_centers_all_orientations,
+    fit_vs_eigenvalue_error_all_orientations_nt,
+)
+from bff_paper_figures.inner_product_functions import InnerProductSettings
+from bff_paper_figures.simulate_and_invert_helper_functions import (
+    double_cosine_inner_product_fit_inversion,
+    sq_cancelled_signal_generator,
+    time_domain_fit_inversion,
+)
+from bff_simulator.constants import exy
 from bff_simulator.homogeneous_ensemble import HomogeneousEnsemble
 from bff_simulator.liouvillian_solver import LiouvillianSolver
-from bff_simulator.abstract_classes.abstract_ensemble import NVOrientation
 from bff_simulator.offaxis_field_experiment_parameters import OffAxisFieldExperimentParametersFactory
-from bff_paper_figures.simulate_and_invert_helper_functions import (
-    sq_cancelled_signal_generator,
-    double_cosine_inner_product_fit_inversion,
-    time_domain_fit_inversion
-)
-from bff_paper_figures.inner_product_functions import InnerProductSettings, double_cosine_inner_product
-from bff_paper_figures.extract_experiment_values import get_ideal_rabi_frequencies, get_true_eigenvalues, find_rabi_frequencies_from_signal
-from bff_paper_figures.fitting_routines import fit_vs_eigenvalue_error_all_orientations_nT, extract_fit_centers_all_orientations
 
 T_TO_UT = 1e6
 HZ_TO_MHZ = 1e-6
@@ -26,9 +28,11 @@ MW_DIRECTION = np.array([0.20539827217056314, 0.11882075246379901, 0.97143871580
 E_FIELD_VECTOR_V_PER_CM = 0 * np.array([1e5, 3e5, 0]) / exy
 
 B_MAGNITUDE_T = 50e-6
-B_THETA =  3*np.pi/8
-B_PHI = 13*np.pi/16
-B_FIELD_VECTOR_T = B_MAGNITUDE_T*np.array([np.sin(B_THETA)*np.cos(B_PHI), np.sin(B_THETA)*np.sin(B_PHI), np.cos(B_THETA)])
+B_THETA = 3 * np.pi / 8
+B_PHI = 13 * np.pi / 16
+B_FIELD_VECTOR_T = B_MAGNITUDE_T * np.array(
+    [np.sin(B_THETA) * np.cos(B_PHI), np.sin(B_THETA) * np.sin(B_PHI), np.cos(B_THETA)]
+)
 
 NOMINAL_RABI_FREQ_BASE_HZ = 100e6
 RABI_MAX_RANGE = np.linspace(50e6, 150e6, 201)
@@ -43,9 +47,9 @@ RABI_FREQ_RANGE_TO_PROBE_HZ = np.linspace(20e6, 150e6, 201)
 HEIGHT_FACTOR = 0.3
 PROMINENCE_FACTOR = 0.3
 
-PEAK_INDEX = 0 # Which frequency we will be comparing to expected value; 0 is highest-frequency peak
+PEAK_INDEX = 0  # Which frequency we will be comparing to expected value; 0 is highest-frequency peak
 
-RUN_LABEL = f"rabi_{min(RABI_MAX_RANGE)*1e-6:.02f}_to_{max(RABI_MAX_RANGE)*1e-6:.02f}_mhz"
+RUN_LABEL = f"rabi_{min(RABI_MAX_RANGE) * 1e-6:.02f}_to_{max(RABI_MAX_RANGE) * 1e-6:.02f}_mhz"
 
 # Set up simulation for everything except maximum Rabi frequency
 nv_ensemble = HomogeneousEnsemble()
@@ -75,12 +79,12 @@ inner_product_settings = InnerProductSettings(
 )
 
 rabi_maxes = []
-errors_freq_nT = []
-errors_time_nT = []
+errors_freq_nt = []
+errors_time_nt = []
 
 # Optionally load a partially completed simulation
-# errors_freq_nT = list(np.loadtxt(f"errors_nt_freq_{RUN_LABEL}.txt"))
-# errors_time_nT = list(np.loadtxt(f"errors_nt_time_{RUN_LABEL}.txt", ))
+# errors_freq_nt = list(np.loadtxt(f"errors_nt_freq_{RUN_LABEL}.txt"))
+# errors_time_nt = list(np.loadtxt(f"errors_nt_time_{RUN_LABEL}.txt", ))
 # rabi_maxes = list(np.loadtxt(f"rabi_values_{RUN_LABEL}.txt"))
 
 for rabi_max in RABI_MAX_RANGE:
@@ -89,16 +93,25 @@ for rabi_max in RABI_MAX_RANGE:
         exp_param_factory.set_base_rabi_frequency(rabi_max)
         sq_cancelled_signal = sq_cancelled_signal_generator(exp_param_factory, nv_ensemble, off_axis_solver)
 
-        # Use the "ground truth" hamiltonian to calculate the transition frequencies we wish to extract, as well as 
-        # the "ground truth" rabi frequencies for each 
-        dq_larmor_freqs_all_axes_hz, bz_values_all_axes_t = get_true_eigenvalues(exp_param_factory.get_experiment_parameters())
+        # Use the "ground truth" hamiltonian to calculate the transition frequencies we wish to extract, as well as
+        # the "ground truth" rabi frequencies for each
+        dq_larmor_freqs_all_axes_hz, bz_values_all_axes_t = get_true_eigenvalues(
+            exp_param_factory.get_experiment_parameters()
+        )
         ideal_rabi_frequencies = get_ideal_rabi_frequencies(exp_param_factory.get_experiment_parameters())
-        print(f"Ideal Rabi frequencies: {np.array2string(ideal_rabi_frequencies*1e-6, precision=2)}")
-        
-        try:    
+        print(f"Ideal Rabi frequencies: {np.array2string(ideal_rabi_frequencies * 1e-6, precision=2)}")
+
+        try:
             # Run the analysis using the rabi frequency extracted from the signal
-            rabi_frequencies=find_rabi_frequencies_from_signal(sq_cancelled_signal, inner_product_settings, rabi_freq_range_to_probe_hz= RABI_FREQ_RANGE_TO_PROBE_HZ, height_factor=HEIGHT_FACTOR, prominence_factor=PROMINENCE_FACTOR, use_time_domain_summation_for_initial_guesses=False)
-            print(f"Extracted Rabi frequencies: {np.array2string(rabi_frequencies*1e-6, precision=2)}")
+            rabi_frequencies = find_rabi_frequencies_from_signal(
+                sq_cancelled_signal,
+                inner_product_settings,
+                rabi_freq_range_to_probe_hz=RABI_FREQ_RANGE_TO_PROBE_HZ,
+                height_factor=HEIGHT_FACTOR,
+                prominence_factor=PROMINENCE_FACTOR,
+                use_time_domain_summation_for_initial_guesses=False,
+            )
+            print(f"Extracted Rabi frequencies: {np.array2string(rabi_frequencies * 1e-6, precision=2)}")
 
             # frequency domain inversion
             peakfit_results = double_cosine_inner_product_fit_inversion(
@@ -110,33 +123,37 @@ for rabi_max in RABI_MAX_RANGE:
                 constrain_same_width=True,
                 allow_zero_peak=True,
             )
-            errors_fd_nT = fit_vs_eigenvalue_error_all_orientations_nT(peakfit_results, dq_larmor_freqs_all_axes_hz)
-            print(f"Rabi_max = {1e-6*rabi_max:.2f} MHz, freq domain errors = {np.array2string(errors_fd_nT[:, PEAK_INDEX], precision=2)} nT") 
+            errors_fd_nt = fit_vs_eigenvalue_error_all_orientations_nt(peakfit_results, dq_larmor_freqs_all_axes_hz)
+            print(
+                f"Rabi_max = {1e-6 * rabi_max:.2f} MHz, freq domain errors = {np.array2string(errors_fd_nt[:, PEAK_INDEX], precision=2)} nT"
+            )
 
             # time domain inversion using results from frequency domain inversion as an initial guess
             freq_guesses_all_orientations = extract_fit_centers_all_orientations(peakfit_results)
             time_domain_fit_results = time_domain_fit_inversion(
-                sq_cancelled_signal, 
-                rabi_frequencies, 
-                inner_product_settings, 
-                freq_guesses_all_orientations, 
+                sq_cancelled_signal,
+                rabi_frequencies,
+                inner_product_settings,
+                freq_guesses_all_orientations,
                 T2STAR_S,
-                fix_phase_to_zero= False,
-                constrain_same_decay= True,
-                constrain_hyperfine_freqs= True, 
-                )
-            
+                fix_phase_to_zero=False,
+                constrain_same_decay=True,
+                constrain_hyperfine_freqs=True,
+            )
+
             # Compare extracted transition frequencies to the ideal values
-            errors_td_nT = fit_vs_eigenvalue_error_all_orientations_nT(time_domain_fit_results, dq_larmor_freqs_all_axes_hz)
-            print(f"\t \t \t time domain fit errors = {np.array2string(errors_td_nT[:, PEAK_INDEX], precision=3)} nT")
+            errors_td_nt = fit_vs_eigenvalue_error_all_orientations_nt(
+                time_domain_fit_results, dq_larmor_freqs_all_axes_hz
+            )
+            print(f"\t \t \t time domain fit errors = {np.array2string(errors_td_nt[:, PEAK_INDEX], precision=3)} nT")
 
             rabi_maxes.append(rabi_max)
-            errors_freq_nT.append(errors_fd_nT[:, PEAK_INDEX])
-            errors_time_nT.append(errors_td_nT[:, PEAK_INDEX])
-        
-        except ValueError:
-            print(f"Rabi_max = {1e-6*rabi_max:.2f} MHz generated ValueError ")
+            errors_freq_nt.append(errors_fd_nt[:, PEAK_INDEX])
+            errors_time_nt.append(errors_td_nt[:, PEAK_INDEX])
 
-        #np.savetxt(f"errors_nt_freq_{RUN_LABEL}.txt", errors_freq_nT)
-        #np.savetxt(f"errors_nt_time_{RUN_LABEL}.txt", errors_time_nT)
-        #np.savetxt(f"rabi_values_{RUN_LABEL}.txt", rabi_maxes)
+        except ValueError:
+            print(f"Rabi_max = {1e-6 * rabi_max:.2f} MHz generated ValueError ")
+
+        # np.savetxt(f"errors_nt_freq_{RUN_LABEL}.txt", errors_freq_nt)
+        # np.savetxt(f"errors_nt_time_{RUN_LABEL}.txt", errors_time_nt)
+        # np.savetxt(f"rabi_values_{RUN_LABEL}.txt", rabi_maxes)

@@ -1,9 +1,8 @@
 from dataclasses import dataclass
-from numpy.typing import NDArray
-import numpy as np
-from scipy.signal import windows
 
-from bff_simulator.offaxis_field_experiment_parameters import OffAxisFieldExperimentParameters
+import numpy as np
+from numpy.typing import NDArray
+from scipy.signal import windows
 
 
 @dataclass
@@ -14,6 +13,7 @@ class InnerProductSettings:  # Settings shared by all inner products performed i
     ramsey_window: str = "boxcar"  # Best option: "boxcar"
     subtract_mean: bool = True  # Best option: True
     use_effective_rabi_frequency: bool = True  # Best option: True (for frequency domain inversion)
+
 
 # Take the inner product of the signal with a sinusoidal function (either np.cos or np.sin)
 def inner_product_sinusoid(
@@ -29,6 +29,7 @@ def inner_product_sinusoid(
         * sinusoid_function(2 * np.pi * (inner_product_freq_hz) * sample_times_s)
     )
     return numerator / denominator
+
 
 # Calculates the inner product I(rabi_freq, ramsey_freq) for specified values of rabi_freq and ramsey_freq
 def double_cosine_inner_product(
@@ -54,6 +55,7 @@ def double_cosine_inner_product(
     )
 
     return double_inner_product_cos_cos
+
 
 # Calculate I(rabi_freq, ramsey_freq) for a range of values of ramsey_freq
 def double_cosine_inner_product_vs_ramsey(
