@@ -61,10 +61,8 @@ RABI_FREQ_RANGE_HZ = np.linspace(60e6, 100e6, 201)
 
 # Set up the simulation and calculate the single-quantum-cancelled VPDR signal
 nv_ensemble = HomogeneousEnsemble()
-nv_ensemble.efield_splitting_hz = np.linalg.norm(E_FIELD_VECTOR_V_PER_CM) * exy
 nv_ensemble.t2_star_s = T2STAR_S
 nv_ensemble.add_full_diamond_populations()
-nv_ensemble.mw_direction = MW_DIRECTION
 
 off_axis_solver = LiouvillianSolver()
 
