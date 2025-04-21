@@ -3,18 +3,17 @@ from math import floor
 import numpy as np
 from matplotlib import pyplot as plt
 
-from bff_paper_figures.extract_experiment_values import get_ideal_rabi_frequencies, get_true_eigenvalues
+from bff_paper_figures.extract_experiment_values import get_ideal_rabi_frequencies, get_true_transition_frequencies
 from bff_paper_figures.fitting_routines import (
     extract_fit_centers_all_orientations,
     fit_vs_eigenvalue_error_all_orientations_nt,
 )
 from bff_paper_figures.inner_product_functions import InnerProductSettings
-from bff_paper_figures.simulate_and_invert_helper_functions import (
-    angles_already_evaluated,
-    double_cosine_inner_product_fit_inversion,
-    sq_cancelled_signal_generator,
-    time_domain_fit_inversion,
+from bff_paper_figures.inversions import (
+    freq_domain_inversion,
+    time_domain_inversion,
 )
+from bff_paper_figures.simulation_helper_functions import angles_already_evaluated, sq_cancelled_signal_generator
 from bff_simulator.abstract_classes.abstract_ensemble import NVOrientation
 from bff_simulator.constants import NVaxes_100, exy
 from bff_simulator.homogeneous_ensemble import HomogeneousEnsemble
@@ -31,11 +30,11 @@ E_FIELD_VECTOR_V_PER_CM = 0 * np.array([1e5, 3e5, 0]) / exy
 B_MAGNITUDE_T = 50e-6
 B_THETA_START = 0
 B_THETA_STOP = np.pi
-B_THETA_N = 91
+B_THETA_N = 11
 
 B_PHI_START = 0
 B_PHI_STOP = 2 * np.pi
-B_PHI_N_MAX = 181
+B_PHI_N_MAX = 21
 B_PHI_N_MIN = 5
 
 RABI_FREQ_BASE_HZ = 100e6
@@ -102,13 +101,13 @@ for theta in np.linspace(B_THETA_START, B_THETA_STOP, B_THETA_N):
             exp_param_factory.set_b_field_vector(b_field_vector_t)
             sq_cancelled_signal = sq_cancelled_signal_generator(exp_param_factory, nv_ensemble, off_axis_solver)
 
-            larmor_freqs_all_axes_hz, bz_values_all_axes_t = get_true_eigenvalues(
+            larmor_freqs_all_axes_hz, bz_values_all_axes_t = get_true_transition_frequencies(
                 exp_param_factory.get_experiment_parameters()
             )
             ideal_rabi_frequencies = get_ideal_rabi_frequencies(exp_param_factory.get_experiment_parameters())
             try:
                 # frequency domain inversion
-                peakfit_results = double_cosine_inner_product_fit_inversion(
+                peakfit_results = freq_domain_inversion(
                     sq_cancelled_signal,
                     ideal_rabi_frequencies,
                     inner_product_settings,
@@ -124,7 +123,7 @@ for theta in np.linspace(B_THETA_START, B_THETA_STOP, B_THETA_N):
 
                 # time domain inversion using the ideal rabi frequencies and initial guesses from frequency domain inversion
                 freq_guesses_all_orientations = extract_fit_centers_all_orientations(peakfit_results)
-                time_domain_fit_results = time_domain_fit_inversion(
+                time_domain_fit_results = time_domain_inversion(
                     sq_cancelled_signal,
                     ideal_rabi_frequencies,
                     inner_product_settings,

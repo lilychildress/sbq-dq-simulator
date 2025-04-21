@@ -6,13 +6,13 @@ from scipy.signal import windows
 
 
 @dataclass
-class InnerProductSettings:  # Settings shared by all inner products performed in a given inversion protocol
+class InnerProductSettings:  # Settings shared by all double inner products performed in a given inversion protocol
     mw_pulse_durations_s: NDArray
     free_evolution_times_s: NDArray
-    rabi_window: str = "boxcar"  # Best option: "blackman"
-    ramsey_window: str = "boxcar"  # Best option: "boxcar"
+    rabi_window: str = "boxcar"  # Best option: "blackman"; can be any scipy.signal.windows window
+    ramsey_window: str = "boxcar"  # Best option: "boxcar"; can be any scipy.signal.windows window
     subtract_mean: bool = True  # Best option: True
-    use_effective_rabi_frequency: bool = True  # Best option: True (for frequency domain inversion)
+    use_effective_rabi_frequency: bool = True  # Best option: True
 
 
 # Take the inner product of the signal with a sinusoidal function (either np.cos or np.sin)

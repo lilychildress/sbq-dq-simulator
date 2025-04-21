@@ -1,16 +1,12 @@
 import numpy as np
 from lmfit import Model
 from lmfit.model import ModelResult
-from matplotlib import pyplot as plt
 from numpy.typing import NDArray
 from scipy.signal import find_peaks
 
+from bff_paper_figures.shared_parameters import N_HYPERFINE, T_TO_NT
 from bff_simulator.constants import f_h, gammab
 from bff_simulator.homogeneous_ensemble import NVOrientation
-
-HZ_TO_MHZ = 1e-6
-T_TO_NT = 1e9
-N_HYPERFINE = 3
 
 
 def offset(x: float, offset_value: float) -> float:
@@ -27,12 +23,12 @@ def decaying_cosine(x: float, freq: float, decay_time: float, amplitude: float, 
 
 def set_up_three_cos_model(
     time_domain_ramsey_signal: NDArray,
-    freq_guesses: NDArray,
+    freq_guesses: NDArray,  # First element should be the highest-frequency guess
     t2star_s: float,
     fix_phase_to_zero=False,
     constrain_same_decay=False,
     constrain_hyperfine_freqs=False,
-):
+) -> tuple:
     signal_amplitude = (max(time_domain_ramsey_signal) - min(time_domain_ramsey_signal)) / 2
     model = Model(offset)
     for i in range(N_HYPERFINE):
@@ -54,6 +50,10 @@ def set_up_three_cos_model(
     return model, params
 
 
+# Fits the time-domain Ramsey signal to three sinusoids. The first two arguments
+# are the x (evolution time) and y (ramsey signal) data vectors. freq_guesses is
+# a (4,3) array of initial guesses for the frequencies of all four orientations
+# and all three hyperfine lines.
 def fit_three_cos_model(
     evolution_times_s: NDArray,
     time_domain_ramsey_signal: NDArray,
@@ -62,7 +62,7 @@ def fit_three_cos_model(
     fix_phase_to_zero: bool = False,
     constrain_same_decay: bool = False,
     constrain_hyperfine_freqs: bool = False,
-):
+) -> ModelResult:
     model, params = set_up_three_cos_model(
         time_domain_ramsey_signal,
         freq_guesses,
@@ -117,8 +117,10 @@ def set_up_three_peak_model(
     return three_peak_model, params
 
 
-# Fits the double inner product (as a function of ramsey frequency) to three Lorentzians. The firt two arguments
-# are the x (ramsey frequency) and y (inner product) data vectors.
+# Fits the double inner product (as a function of ramsey frequency) to three Lorentzians. The first two arguments
+# are the x (ramsey frequency) and y (inner product) data vectors. height_factor and prominence_factor are used in
+# find_peaks to get initial guesses for the Lorentzian center frequencies. t2star_s is used to get an initial guess
+# for the width.
 def fit_constrained_hyperfine_peaks(
     ramsey_freqs_range_hz: NDArray,
     double_inner_product_cos_cos: NDArray,
@@ -153,24 +155,6 @@ def fit_constrained_hyperfine_peaks(
     return result
 
 
-def plot_fit_vs_inner_product(
-    ramsey_freqs_range_hz: NDArray, double_inner_product_cos_cos: NDArray, fit_result: ModelResult
-) -> None:
-    fit_peaks = extract_fit_centers(fit_result)
-    plt.vlines(
-        HZ_TO_MHZ * fit_peaks,
-        [max(double_inner_product_cos_cos)],
-        [min(double_inner_product_cos_cos)],
-        label="fitted peaks",
-        color="red",
-    )
-    plt.plot(HZ_TO_MHZ * ramsey_freqs_range_hz, double_inner_product_cos_cos, label="cos-cos inner product")
-    plt.plot(HZ_TO_MHZ * ramsey_freqs_range_hz, fit_result.best_fit, label="hyperfine-constrained fit")
-    plt.xlabel("Inner product Ramsey frequency (MHz)")
-    plt.ylabel("Double cosine inner product (a.u.)")
-    plt.legend()
-
-
 def extract_fit_centers(fit_result: ModelResult) -> NDArray:
     return np.array([fit_result.best_values[f"p{i}_freq"] for i in range(N_HYPERFINE)])
 
@@ -179,15 +163,11 @@ def extract_fit_centers_all_orientations(fit_results: list[type[ModelResult]]) -
     return np.array([extract_fit_centers(fit_results[orientation]) for orientation in NVOrientation])
 
 
-def extract_fit_center_stderrs_nt(fit_result: ModelResult) -> NDArray:
-    return T_TO_NT * np.array([fit_result.params[f"p{i}_freq"].stderr for i in range(N_HYPERFINE)]) / (2 * gammab)
-
-
-def extract_fit_center_stderrs_all_orientations_nt(fit_results: list[type[ModelResult]]) -> NDArray:
-    return np.array([extract_fit_center_stderrs_nt(fit_results[orientation]) for orientation in NVOrientation])
-
-
-def fit_vs_eigenvalue_error_nt(fit_result: ModelResult, larmor_freqs_hz: NDArray):
+# Extracts the errors in determining the ms=+-1 transition frequencies for one NV orientation and
+# all three hyperfine projections, evaluating the fit result compared to the ideal larmor_freqs_hz.
+# The errors are expressed as a deviation in equivalent axial magnetic field, in nT, by dividing
+# the frequency error by 2*gammab.
+def fit_vs_eigenvalue_error_nt(fit_result: ModelResult, larmor_freqs_hz: NDArray) -> NDArray:
     fit_peaks = extract_fit_centers(fit_result)
     eigenvalue_error_nt = []
     for peak in fit_peaks:
