@@ -51,10 +51,8 @@ PEAK_INDEX = 0  # Which extracted eigenfrequency we will be comparing to expecte
 RUN_LABEL = f"b_{B_MAGNITUDE_T * T_TO_UT:.0f}_ut_t2s_{T2STAR_S * 1e6:.0f}_us_fine_3us_ramsey_800ns_rabi"
 
 nv_ensemble = HomogeneousEnsemble()
-nv_ensemble.efield_splitting_hz = np.linalg.norm(E_FIELD_VECTOR_V_PER_CM) * exy
 nv_ensemble.t2_star_s = T2STAR_S
 nv_ensemble.add_full_diamond_populations()
-nv_ensemble.mw_direction = MW_DIRECTION
 
 off_axis_solver = LiouvillianSolver()
 
