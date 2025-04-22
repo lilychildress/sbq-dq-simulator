@@ -19,13 +19,7 @@ from bff_simulator.constants import NVaxes_100, exy
 from bff_simulator.homogeneous_ensemble import HomogeneousEnsemble
 from bff_simulator.liouvillian_solver import LiouvillianSolver
 from bff_simulator.offaxis_field_experiment_parameters import OffAxisFieldExperimentParametersFactory
-
-T_TO_UT = 1e6
-HZ_TO_MHZ = 1e-6
-
-MW_DIRECTION = np.array([0.97203398, 0.2071817, 0.11056978])  # Vincent's old "magic angle"
-MW_DIRECTION = np.array([0.20539827217056314, 0.11882075246379901, 0.9714387158093318])  # Lily's new "magic angle"
-E_FIELD_VECTOR_V_PER_CM = 0 * np.array([1e5, 3e5, 0]) / exy
+from bff_paper_figures.shared_parameters import T_TO_UT, MW_DIRECTION, E_FIELD_VECTOR_V_PER_CM, RABI_FREQ_BASE_HZ, DETUNING_HZ, RAMSEY_FREQ_RANGE_INITIAL_GUESS_HZ, T2STAR_S, PEAK_INDEX
 
 B_MAGNITUDE_T = 50e-6
 B_THETA_START = 0
@@ -37,16 +31,8 @@ B_PHI_STOP = 2 * np.pi
 B_PHI_N_MAX = 181
 B_PHI_N_MIN = 5
 
-RABI_FREQ_BASE_HZ = 100e6
-DETUNING_HZ = 0e6
-SECOND_PULSE_PHASE = 0
 MW_PULSE_LENGTH_S = np.arange(0, 800e-9, 2.5e-9)  # np.linspace(0, 0.5e-6, 1001)
 EVOLUTION_TIME_S = np.arange(0, 3e-6, 20e-9)  # p.linspace(0, 15e-6, 801)
-T2STAR_S = 2e-6
-N_RAMSEY_POINTS = 251
-RAMSEY_FREQ_RANGE_INITIAL_GUESS_HZ = np.linspace(0, 10e6, N_RAMSEY_POINTS)
-
-PEAK_INDEX = 0  # Which extracted eigenfrequency we will be comparing to expected value; 0 is highest-frequency peak
 
 RUN_LABEL = f"b_{B_MAGNITUDE_T * T_TO_UT:.0f}_ut_t2s_{T2STAR_S * 1e6:.0f}_us_fine_3us_ramsey_800ns_rabi"
 
