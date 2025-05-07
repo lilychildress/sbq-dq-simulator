@@ -3,7 +3,7 @@ from matplotlib import pyplot as plt
 from numpy.typing import NDArray
 
 
-def imshow_with_extents(xaxis, yaxis, data: NDArray, aspect_ratio: float = 1, vmin=None, vmax=None):
+def imshow_with_extents(xaxis, yaxis, data: NDArray, aspect_ratio: float = 1, vmin=None, vmax=None, cmap="inferno"):
     if data.shape != (len(yaxis), len(xaxis)):
         raise ValueError("x-axis, y-axis shape doesn't match data")
     if len(xaxis) <= 1 or len(yaxis) <= 1:
@@ -24,7 +24,8 @@ def imshow_with_extents(xaxis, yaxis, data: NDArray, aspect_ratio: float = 1, vm
         vmin=vmin,
         vmax=vmax,
         origin="lower",
-        cmap="inferno",
+        cmap=cmap,
+        interpolation="none"
     )
 
 
@@ -39,6 +40,7 @@ def imshow_with_extents_and_crop(
     ymax=None,
     vmin=None,
     vmax=None,
+    cmap="inferno"
 ):
     small_quantity_to_ensure_no_cropping = 1
     if xmin is None:
@@ -52,5 +54,5 @@ def imshow_with_extents_and_crop(
     x_mask = np.all(np.array([(xmin <= xaxis), xaxis <= xmax]), axis=0)
     y_mask = np.all(np.array([(ymin <= yaxis), yaxis <= ymax]), axis=0)
     imshow_with_extents(
-        xaxis[x_mask], yaxis[y_mask], data[y_mask, :][:, x_mask], vmin=vmin, vmax=vmax, aspect_ratio=aspect_ratio
+        xaxis[x_mask], yaxis[y_mask], data[y_mask, :][:, x_mask], vmin=vmin, vmax=vmax, aspect_ratio=aspect_ratio, cmap=cmap
     )
