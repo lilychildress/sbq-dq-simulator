@@ -30,8 +30,8 @@ B_PLUS_DB_VECTOR_T = (B_MAGNITUDE_T + DELTA_B_T) * np.array(
 )
 
 IDEAL_RABI_FREQUENCIES= np.array([RABI_FREQ_BASE_HZ * perpendicular_projection(MW_DIRECTION, NVaxis) for NVaxis in NVaxes_100])
-MW_RABI_PERIOD_DIVISION = 4
-EVOLUTION_STEPS_UNTIL_OPTIMAL = 1
+MW_RABI_PERIOD_DIVISION = 10
+EVOLUTION_STEPS_UNTIL_OPTIMAL = 10
 INDEX_FOR_MI_1 = 0
 MW_STEP_S = 1/(MW_RABI_PERIOD_DIVISION*IDEAL_RABI_FREQUENCIES[NVOrientation.A])
 MW_PULSE_LENGTH_S =np.arange(0, 800e-9, MW_STEP_S)  #np.arange(0, 800e-9, 2.5e-9)  # np.linspace(0, 0.5e-6, 1001)
@@ -57,14 +57,8 @@ def slope(tau_s, larmor_actual_hz, t2star_s):
     t2s = t2star_s
     return 2*np.exp(-2*t/t2s)*t*np.sin(2*t*w)
 
-# Monte Carlo simulation of sensitivity ratio for VPDR vs DQ. Calculates the standard
-# deviation of the magnetic field readings in the presence of Gaussian readout noise.
-# Compares fluctuations in the average value of a DQ signal [averaged over as many samples (at the optimal MW time)
-# as there are pulse durations] to fluctuations in a VPDR signal analyzed with an inner product on 
-# the Rabi dimension. Both signals are evaluated for a single NV orientation, single hyperfine line
-# at the optimal free evolution time for sensitivity. 
-def compare_single_point_sensitivity(max_mw_pulse_s, rabi_window_name):
-    mw_pulse_length_s =np.arange(0, max_mw_pulse_s, MW_STEP_S) 
+# Do everything that won't change if we change the MW pulse durations
+def setup_simulation():
     nv_ensemble = HomogeneousEnsemble()
     nv_ensemble.t2_star_s = T2STAR_S
     nv_ensemble.add_nv_single_species(NVOrientation.A, NV14HyperfineField.N14_plus)
@@ -76,31 +70,36 @@ def compare_single_point_sensitivity(max_mw_pulse_s, rabi_window_name):
     exp_param_factory.set_mw_direction(MW_DIRECTION)
     exp_param_factory.set_e_field_v_per_m(E_FIELD_VECTOR_V_PER_CM)
     exp_param_factory.set_detuning(DETUNING_HZ)
-    exp_param_factory.set_mw_pulse_lengths(mw_pulse_length_s)
 
     # Extract the ground truth for the expected magnetic field
     exp_param_factory.set_b_field_vector(B_VECTOR_T)
-    larmor_freqs_all_axes_hz, bz_values_all_axes_t = get_true_transition_frequencies(
+    larmor_freqs_all_axes_hz, _ = get_true_transition_frequencies(
         exp_param_factory.get_experiment_parameters()
     )
 
     # Determine the optimal time for measurement (in theory) and make sure it appears in our evolution times
     larmor_actual_hz = larmor_freqs_all_axes_hz[NVOrientation.A][INDEX_FOR_MI_1] # double quantum larmor frequency
     optimal_evolution_time_s = get_optimal_evolution_time_s(larmor_actual_hz, T2STAR_S)
-    evolution_times_s = np.arange(0, 2*T2STAR_S, optimal_evolution_time_s/EVOLUTION_STEPS_UNTIL_OPTIMAL)
-    plt.plot(evolution_times_s, np.abs(slope(evolution_times_s, larmor_actual_hz, T2STAR_S)))
-    plt.vlines(optimal_evolution_time_s, 0, max(slope(evolution_times_s, larmor_actual_hz, T2STAR_S)), color="red")
+    evolution_times_s = np.arange(0, 2*T2STAR_S, optimal_evolution_time_s/(EVOLUTION_STEPS_UNTIL_OPTIMAL))
+    evolution_times_fine_s = np.arange(0, 2*T2STAR_S, optimal_evolution_time_s/(EVOLUTION_STEPS_UNTIL_OPTIMAL*10))
+    plt.plot(evolution_times_fine_s, np.abs(slope(evolution_times_fine_s, larmor_actual_hz, T2STAR_S)))
+    plt.vlines(optimal_evolution_time_s, 0, max(slope(evolution_times_fine_s, larmor_actual_hz, T2STAR_S)), color="red")
     plt.show()
     exp_param_factory.set_evolution_times(evolution_times_s)
 
+    return nv_ensemble, exp_param_factory, off_axis_solver
 
+def get_signal_slopes(exp_param_factory:OffAxisFieldExperimentParametersFactory, nv_ensemble, off_axis_solver, rabi_window_name, b_vector_t=B_VECTOR_T, b_plus_db_vector_t=B_PLUS_DB_VECTOR_T):
     # Calculate the SQ cancelled signal at the magnetic field of interest
-    exp_param_factory.set_b_field_vector(B_VECTOR_T)
+    exp_param_factory.set_b_field_vector(b_vector_t)
+    _, bz_values_all_axes_t = get_true_transition_frequencies(
+        exp_param_factory.get_experiment_parameters()
+    )
     sq_cancelled_signal = sq_cancelled_signal_generator(exp_param_factory, nv_ensemble, off_axis_solver)
 
     # Now do the same thing at a slightly different magnetic field so that we can calculate the "slope" with
     # respect to magnetic field at the optimal evolution time for measurement
-    exp_param_factory.set_b_field_vector(B_PLUS_DB_VECTOR_T)
+    exp_param_factory.set_b_field_vector(b_plus_db_vector_t)
     sq_cancelled_signal_delta_b = sq_cancelled_signal_generator(exp_param_factory, nv_ensemble, off_axis_solver)
     _, bz_values_all_axes_delta_b_t = get_true_transition_frequencies(
         exp_param_factory.get_experiment_parameters()
@@ -108,6 +107,7 @@ def compare_single_point_sensitivity(max_mw_pulse_s, rabi_window_name):
 
     # Pick out the inner-product signals at the expected magnetic field and the slightly shifted one
     orientation = NVOrientation.A
+    mw_pulse_length_s = exp_param_factory.get_experiment_parameters().mw_pulse_length_s
     rabi_window = windows.get_window(rabi_window_name, len(mw_pulse_length_s))
     time_domain_ramsey_signal = inner_product_sinusoid(
         np.cos,
@@ -127,13 +127,29 @@ def compare_single_point_sensitivity(max_mw_pulse_s, rabi_window_name):
     # Calculate how much the axial field changes per unit change in the inner-producted signal (the "slope" with respect to axial field)
     slope_dbz_dsignal_inner_product = (bz_values_all_axes_delta_b_t[NVOrientation.A][INDEX_FOR_MI_1]/2 - bz_values_all_axes_t[NVOrientation.A][INDEX_FOR_MI_1]/2)/(
     (time_domain_ramsey_signal_delta_b[EVOLUTION_STEPS_UNTIL_OPTIMAL] - time_domain_ramsey_signal[EVOLUTION_STEPS_UNTIL_OPTIMAL]))
+
     # Calculate how much the axial field changes per unit change in the single-point signal (the "slope" with respect to axial field)
     slope_dbz_dsignal_dq = (bz_values_all_axes_delta_b_t[NVOrientation.A][INDEX_FOR_MI_1]/2 - bz_values_all_axes_t[NVOrientation.A][INDEX_FOR_MI_1]/2)/(
     (sq_cancelled_signal[int(MW_RABI_PERIOD_DIVISION/2)][EVOLUTION_STEPS_UNTIL_OPTIMAL] - sq_cancelled_signal_delta_b[int(MW_RABI_PERIOD_DIVISION/2)][EVOLUTION_STEPS_UNTIL_OPTIMAL]))
 
-    # Now add in measurement noise, and see how much that changes the signals
-    rng = np.random.default_rng(SEED)
+    return slope_dbz_dsignal_dq, slope_dbz_dsignal_inner_product, sq_cancelled_signal, time_domain_ramsey_signal
 
+
+# Monte Carlo simulation of sensitivity ratio for VPDR vs DQ. Calculates the standard
+# deviation of the magnetic field readings in the presence of Gaussian readout noise.
+# Compares fluctuations in the average value of a DQ signal [averaged over as many samples (at the optimal MW time)
+# as there are pulse durations] to fluctuations in a VPDR signal analyzed with an inner product on 
+# the Rabi dimension. Both signals are evaluated for a single NV orientation, single hyperfine line
+# at the optimal free evolution time for sensitivity. 
+def compare_single_point_sensitivity(rabi_window_name, exp_param_factory:OffAxisFieldExperimentParametersFactory, off_axis_solver, nv_ensemble, rng, orientation=NVOrientation.A):
+
+    # find the slope in signal at the optimal time to measure
+    slope_dbz_dsignal_dq, slope_dbz_dsignal_inner_product, sq_cancelled_signal, time_domain_ramsey_signal = get_signal_slopes(exp_param_factory, nv_ensemble, off_axis_solver, rabi_window_name, B_VECTOR_T, B_PLUS_DB_VECTOR_T)
+    
+    mw_pulse_length_s = exp_param_factory.get_experiment_parameters().mw_pulse_length_s
+    rabi_window = windows.get_window(rabi_window_name, len(mw_pulse_length_s))
+
+    # Now add in measurement noise, and see how much that changes the signals
     noisy_delta_b_inner_product_t = []
     noisy_delta_b_dq_t = []
     for _ in range(N_SAMPLES):
@@ -156,12 +172,20 @@ def compare_single_point_sensitivity(max_mw_pulse_s, rabi_window_name):
     # dominated by measurement time.
     return np.std(np.array(noisy_delta_b_inner_product_t))/np.std(np.array(noisy_delta_b_dq_t))
 
+s_to_ns = 1e9  
+nv_ensemble, exp_param_factory, off_axis_solver = setup_simulation()
+  
 max_mw_duration_range = np.arange(50e-9, 800e-9, 25e-9)
 blackman_sensitivity_ratios = []
 boxcar_sensitivity_ratios = []
+rng = np.random.default_rng(SEED)
 for max_mw_duration in max_mw_duration_range: 
-    blackman_sensitivity_ratios.append(compare_single_point_sensitivity(max_mw_duration, "blackman"))
-    boxcar_sensitivity_ratios.append(compare_single_point_sensitivity(max_mw_duration, "boxcar"))
+    print(f"Maximum MW duration: {max_mw_duration*s_to_ns} ns")
+    mw_pulse_length_s =np.arange(0, max_mw_duration, MW_STEP_S) 
+    exp_param_factory.set_mw_pulse_lengths(mw_pulse_length_s)
+
+    blackman_sensitivity_ratios.append(compare_single_point_sensitivity( "blackman", exp_param_factory, off_axis_solver, nv_ensemble,rng))
+    boxcar_sensitivity_ratios.append(compare_single_point_sensitivity( "boxcar", exp_param_factory, off_axis_solver, nv_ensemble, rng))
 
 np.savetxt("max_mw_duration_range.txt", max_mw_duration_range)
 np.savetxt("blackman_sensitivity_ratios.txt", blackman_sensitivity_ratios)
@@ -171,7 +195,6 @@ rabi_window = windows.get_window("blackman", 1000)
 np.mean(rabi_window)
 blackman_factor = np.sqrt(np.mean(rabi_window**2))/np.mean(rabi_window)
 
-s_to_ns = 1e9    
 plt.figure(0, figsize=(3.4, 2.5))
 plt.rcParams["font.size"] = 9
 plt.rcParams["font.family"] = "arial"
@@ -192,5 +215,6 @@ plt.gca().tick_params(direction="in", which="minor", length=2.5)
 plt.gca().tick_params(direction="in", which="major", length=5)
 for spine in plt.gca().spines.values():
     spine.set_linewidth(1.25)
+plt.savefig("single_pt_sensitivity.svg")
 plt.show()
     
