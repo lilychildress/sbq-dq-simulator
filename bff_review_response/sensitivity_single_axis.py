@@ -9,15 +9,15 @@ from bff_paper_figures.inner_product_functions import (
     inner_product_sinusoid,
 )
 
-from bff_paper_figures.extract_experiment_values import get_ideal_rabi_frequencies, get_true_transition_frequencies
-from bff_paper_figures.simulation_helper_functions import angles_already_evaluated, sq_cancelled_signal_generator
+from bff_paper_figures.extract_experiment_values import  get_true_transition_frequencies
+from bff_paper_figures.simulation_helper_functions import sq_cancelled_signal_generator
 from bff_simulator.abstract_classes.abstract_ensemble import NVOrientation, NV14HyperfineField
-from bff_simulator.constants import NVaxes_100, exy
+from bff_simulator.constants import NVaxes_100
 from bff_simulator.homogeneous_ensemble import HomogeneousEnsemble
 from bff_simulator.liouvillian_solver import LiouvillianSolver
-from bff_simulator.vector_manipulation import perpendicular_projection, transform_from_crystal_to_nv_coords
+from bff_simulator.vector_manipulation import perpendicular_projection
 from bff_simulator.offaxis_field_experiment_parameters import OffAxisFieldExperimentParametersFactory
-from bff_paper_figures.shared_parameters import T_TO_UT, MW_DIRECTION, E_FIELD_VECTOR_V_PER_CM, RABI_FREQ_BASE_HZ, DETUNING_HZ, RAMSEY_FREQ_RANGE_INITIAL_GUESS_HZ, T2STAR_S, PEAK_INDEX, B_PHI_FIG4, B_THETA_FIG4
+from bff_paper_figures.shared_parameters import  MW_DIRECTION, E_FIELD_VECTOR_V_PER_CM, RABI_FREQ_BASE_HZ, DETUNING_HZ, T2STAR_S, B_PHI_FIG4, B_THETA_FIG4
 
 B_MAGNITUDE_T = 50e-6
 DELTA_B_T = 1e-8
@@ -42,7 +42,7 @@ SEED = 294813022
 SIG_STD_DEV = 1e-4
 N_SAMPLES = 1000
 
-
+# Functions to determine the optimal free evolution time for measuring a DQ signal
 def optimal_time(tau_s, larmor_actual_hz, t2star_s):
     w = 2*np.pi*larmor_actual_hz/2
     t = tau_s
@@ -52,6 +52,12 @@ def optimal_time(tau_s, larmor_actual_hz, t2star_s):
 def get_optimal_evolution_time_s(larmor_actual_hz, t2star_s):
     return fsolve(optimal_time, [t2star_s/2], (larmor_actual_hz, t2star_s))[0]
 
+# Monte Carlo simulation of sensitivity ratio for VPDR vs DQ. Calculates the standard
+# deviation of the magnetic field readings in the presence of Gaussian readout noise.
+# Compares fluctuations in the average value of a DQ signal [averaged over as many samples (at the optimal MW time)
+# as there are pulse durations] to fluctuations in a VPDR signal analyzed with an inner product on 
+# the Rabi dimension. Both signals are evaluated for a single NV orientation, single hyperfine line
+# at the optimal free evolution time for sensitivity. 
 def compare_single_point_sensitivity(max_mw_pulse_s, rabi_window_name):
     mw_pulse_length_s =np.arange(0, max_mw_pulse_s, MW_STEP_S) 
     nv_ensemble = HomogeneousEnsemble()
