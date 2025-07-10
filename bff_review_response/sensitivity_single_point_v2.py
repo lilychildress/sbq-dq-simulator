@@ -28,7 +28,7 @@ IDEAL_RABI_FREQUENCIES= np.array([RABI_FREQ_BASE_HZ * perpendicular_projection(M
 MW_RABI_PERIOD_DIVISION = 10
 INDEX_FOR_MI0=1
 EVOLUTION_STEPS_UNTIL_OPTIMAL = 10
-MW_STEP_S = 1/(MW_RABI_PERIOD_DIVISION*IDEAL_RABI_FREQUENCIES[NVOrientation.A])
+
 # MW_PULSE_LENGTH_S =np.arange(0, 800e-9, MW_STEP_S)  #np.arange(0, 800e-9, 2.5e-9)  # np.linspace(0, 0.5e-6, 1001)
 # EVOLUTION_TIME_S = np.arange(0, 3e-6, 20e-9)  # p.linspace(0, 15e-6, 801)
 
@@ -89,15 +89,18 @@ def singlepoint_sensitivity_ratios_vs_mw_pulse_max(use_hyperfine=False, orientat
         plt.show()
 
     max_mw_duration_range = MAX_MW_DURATION_RANGE_S
+    mw_step_s = 1/(MW_RABI_PERIOD_DIVISION*IDEAL_RABI_FREQUENCIES[orientation])
+
     blackman_sensitivity_ratios = []
     boxcar_sensitivity_ratios = []
     rng = np.random.default_rng(SEED)
     for max_mw_duration in max_mw_duration_range: 
         print(f"Maximum MW duration: {max_mw_duration*S_TO_NS} ns")
-        mw_pulse_length_s =np.arange(0, max_mw_duration, MW_STEP_S) 
+        mw_pulse_length_s =np.arange(0, max_mw_duration, mw_step_s) 
         exp_param_factory.set_mw_pulse_lengths(mw_pulse_length_s)
 
-        # find the slope in signal at the optimal time to measure
+        # find the slope in signal at the optimal time to measure, and use it to determine the ratio of sensitivities
+        # for Rabi-inner-producted VPDR vs DQ signals both evaluated at the optimal evolution time.
         rabi_window_name = "blackman"
         slope_dbz_dsignal_dq, slope_dbz_dsignal_inner_product, sq_cancelled_signal, time_domain_ramsey_signal = get_signal_slopes(exp_param_factory, nv_ensemble, off_axis_solver, rabi_window_name, B_VECTOR_T, B_PLUS_DB_VECTOR_T, EVOLUTION_STEPS_UNTIL_OPTIMAL, int(MW_RABI_PERIOD_DIVISION/2), NVOrientation.A)
         blackman_sensitivity_ratios.append(compare_single_point_sensitivity(slope_dbz_dsignal_dq, slope_dbz_dsignal_inner_product, sq_cancelled_signal, time_domain_ramsey_signal, rabi_window_name, exp_param_factory.get_experiment_parameters(), rng,EVOLUTION_STEPS_UNTIL_OPTIMAL))

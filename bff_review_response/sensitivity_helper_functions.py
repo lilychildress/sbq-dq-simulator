@@ -61,6 +61,17 @@ def find_optimal_hf_revival_time(larmor_freq_mi0, f_h, t2star_s):
     return optimal_evolution_time_s
 
 
+def fit_decaying_cosine(evolution_times_s, time_domain_ramsey_signal, larmor_freq):
+    model = Model(offset) + Model(decaying_cosine)
+    params = model.make_params()
+    params["amplitude"].value = max(time_domain_ramsey_signal) - min(time_domain_ramsey_signal)
+    params["offset_value"].value = np.mean(time_domain_ramsey_signal)
+    params["decay_time"].value = T2STAR_S/2
+    params["phase"].value = np.pi
+    params["freq"].value = larmor_freq
+    time_domain_result = model.fit(time_domain_ramsey_signal, params, x=evolution_times_s)
+    return time_domain_result
+
 # This function assumes that exp_param_factory is set up and ready to go aside from specifying magnetic field. It calculates the change in signal
 # at the optimal evolution time both for the inner-producted VPDR signal and a DQ signal (i.e. with MW pi pulses) for two different magnetic field conditions
 # and returns the "slope" - i.e. the change in axial magnetic field divided by the change in signal for both possibilities. mi_index does not matter. 
