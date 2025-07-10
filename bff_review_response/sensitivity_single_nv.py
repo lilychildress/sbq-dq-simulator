@@ -39,9 +39,10 @@ INDEX_FOR_MI0 = 1
 
 MAX_MW_PULSE_S= 800e-9
 
-SEED = 294813022
+SEED = 29481302
 
 USE_HYPERFINE = False
+N_SAMPLES=100
 
 rabi_window_name = "blackman"
 orientation = NVOrientation.A
@@ -106,8 +107,8 @@ slope_dbz_dsignal_dq, slope_dbz_dsignal_inner_product, sq_cancelled_signal, time
 # Now add in measurement noise, and see how much that changes the signals
 rng = np.random.default_rng(SEED)
 
-# Select a range of maximum evolution times to consider for fitting
-max_evolution_times_indices = np.arange(0, len(evolution_times_s)+1, 22)[1:]
+# Select a range of maximum evolution times to consider for fitting; drop the really short-time values because they take a long time to fit.
+max_evolution_times_indices = np.arange(0, len(evolution_times_s)+1, 11)[2:]
 
 rabi_window = windows.get_window(rabi_window_name, len(mw_pulse_length_s))
 
@@ -161,29 +162,33 @@ for n in range(N_SAMPLES):
 
 # Calculate the ratio of the noise in the magnetic field, which should be (approximately) the ratio of the sensitivities, assuming that the time is 
 # dominated by measurement time.
-print(np.std(np.array(noisy_delta_b_inner_product_t))/np.std(np.array(noisy_delta_b_dq_t)))
+vpdr_uncertainty = np.std(np.array(noisy_delta_b_inner_product_t))
+dq_uncertainty = np.std(np.array(noisy_delta_b_dq_t))
+print(vpdr_uncertainty/dq_uncertainty)
 # Note that the fit uses more time, so we should multipy by sqrt[number of evolution times] to account for that
-fit_sensitivity_ratio_vs_max_evolution_time=np.std(np.array(noisy_fit_bz_t), axis=0)*np.sqrt(max_evolution_times_indices)/np.std(np.array(noisy_delta_b_dq_t))
-fit_sensitivity_ratio_vs_max_evolution_time_dq=np.std(np.array(noisy_fit_bz_dq_t), axis=0)*np.sqrt(max_evolution_times_indices)/np.std(np.array(noisy_delta_b_dq_t))
+fit_sensitivity_ratio_vs_max_evolution_time=np.std(np.array(noisy_fit_bz_t), axis=0)*np.sqrt(max_evolution_times_indices)/vpdr_uncertainty
+fit_sensitivity_ratio_vs_max_evolution_time_dq=np.std(np.array(noisy_fit_bz_dq_t), axis=0)*np.sqrt(max_evolution_times_indices)/dq_uncertainty
 
 
 np.savetxt("evolution_times_s.txt", evolution_times_s)
-np.savetxt("fit_sens_ratio_vs_evolution_800ns_mw.txt", fit_sensitivity_ratio_vs_max_evolution_time)
+np.savetxt("fit_sens_ratio_vs_evolution_mw.txt", fit_sensitivity_ratio_vs_max_evolution_time)
+np.savetxt("fit_sens_ratio_vs_evolution_mw_dq.txt", fit_sensitivity_ratio_vs_max_evolution_time)
 
 s_to_us = 1e6
 s_to_ns = 1e9
 plt.figure(0, figsize=(3.4, 1.5))
 plt.rcParams["font.size"] = 9
 plt.rcParams["font.family"] = "arial"
-plt.plot(s_to_us*evolution_times_s[max_evolution_times_indices-1], fit_sensitivity_ratio_vs_max_evolution_time, marker = ".", linestyle="")
-plt.plot(s_to_us*evolution_times_s[max_evolution_times_indices-1], fit_sensitivity_ratio_vs_max_evolution_time_dq, marker = ".", linestyle="")
+plt.plot(s_to_us*evolution_times_s[max_evolution_times_indices-1], fit_sensitivity_ratio_vs_max_evolution_time, marker = ".", linestyle="", label="VPDR")
+plt.plot(s_to_us*evolution_times_s[max_evolution_times_indices-1], fit_sensitivity_ratio_vs_max_evolution_time_dq, marker = "*", linestyle="", label="DQ")
 plt.xlabel(r"Maximum free evolution time ($\mu$s)")
-plt.ylabel("VPDR fit vs DQ opt. time \nsensitivity ratio")
-plt.vlines(optimal_evolution_time_s*s_to_us, 10, 40, linestyle="dashed", label="Optimal evolution time")
+plt.ylabel("Fit sensitivity vs \noptimal-time sensitivity")
+plt.legend()
+plt.vlines(optimal_evolution_time_s*s_to_us, 0,10, linestyle="dashed")#, label="Optimal evolution time")
 plt.legend(loc="upper right")
 plt.gca().yaxis.set_ticks_position("both")
 plt.gca().xaxis.set_ticks_position("both")
-plt.ylim((10, 50))
+plt.ylim((0, 6))
 plt.text(2.8, 30,  f"{MAX_MW_PULSE_S*s_to_ns} ns max \npulse duration")
 plt.gca().minorticks_on()
 plt.gca().tick_params(direction="in", which="both", width=1.5)
