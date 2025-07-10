@@ -52,8 +52,7 @@ def set_up_three_cos_model(
 
 # Fits the time-domain Ramsey signal to three sinusoids. The first two arguments
 # are the x (evolution time) and y (ramsey signal) data vectors. freq_guesses is
-# a (4,3) array of initial guesses for the frequencies of all four orientations
-# and all three hyperfine lines.
+# a an array of initial guesses for the frequencies of all three hyperfine lines.
 def fit_three_cos_model(
     evolution_times_s: NDArray,
     time_domain_ramsey_signal: NDArray,

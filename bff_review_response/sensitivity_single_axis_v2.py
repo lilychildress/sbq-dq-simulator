@@ -9,6 +9,7 @@ from bff_paper_figures.inner_product_functions import (
 
 from bff_paper_figures.extract_experiment_values import  get_true_transition_frequencies
 from bff_paper_figures.simulation_helper_functions import sq_cancelled_signal_generator
+from bff_review_response.sensitivity_helper_functions import get_optimal_evolution_time_s, slope
 from bff_paper_figures.fitting_routines import decaying_cosine, offset
 from bff_simulator.abstract_classes.abstract_ensemble import NVOrientation, NV14HyperfineField
 from bff_simulator.constants import NVaxes_100, gammab
@@ -41,24 +42,8 @@ SEED = 294813022
 SIG_STD_DEV = 1e-4
 N_SAMPLES = 1000
 
-# Functions to determine the optimal free evolution time for measuring a DQ signal
-def optimal_time(tau_s, larmor_actual_hz, t2star_s):
-    w = 2*np.pi*larmor_actual_hz/2
-    t = tau_s
-    t2s = t2star_s
-    return 2 * t2s * t * w * np.cos(2 * t * w) + (t2s - 2* t)*np.sin(2 * t * w)
-
-def get_optimal_evolution_time_s(larmor_actual_hz, t2star_s):
-    return fsolve(optimal_time, [t2star_s/1.99], (larmor_actual_hz, t2star_s))[0]
-
-def slope(tau_s, larmor_actual_hz, t2star_s):
-    w = 2*np.pi*larmor_actual_hz/2
-    t = tau_s
-    t2s = t2star_s
-    return 2*np.exp(-2*t/t2s)*t*np.sin(2*t*w)
-
 # Do everything that won't change if we change the MW pulse durations
-def setup_simulation():
+def setup_no_hf_simulation():
     nv_ensemble = HomogeneousEnsemble()
     nv_ensemble.t2_star_s = T2STAR_S
     nv_ensemble.add_nv_single_species(NVOrientation.A, NV14HyperfineField.N14_plus)
@@ -173,7 +158,7 @@ def compare_single_point_sensitivity(rabi_window_name, exp_param_factory:OffAxis
     return np.std(np.array(noisy_delta_b_inner_product_t))/np.std(np.array(noisy_delta_b_dq_t))
 
 s_to_ns = 1e9  
-nv_ensemble, exp_param_factory, off_axis_solver = setup_simulation()
+nv_ensemble, exp_param_factory, off_axis_solver = setup_no_hf_simulation()
   
 max_mw_duration_range = np.arange(50e-9, 800e-9, 25e-9)
 blackman_sensitivity_ratios = []
