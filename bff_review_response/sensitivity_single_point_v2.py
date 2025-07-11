@@ -102,17 +102,20 @@ def singlepoint_sensitivity_ratios_vs_mw_pulse_max(use_hyperfine=False, orientat
         # find the slope in signal at the optimal time to measure, and use it to determine the ratio of sensitivities
         # for Rabi-inner-producted VPDR vs DQ signals both evaluated at the optimal evolution time.
         rabi_window_name = "blackman"
-        slope_dbz_dsignal_dq, slope_dbz_dsignal_inner_product, sq_cancelled_signal, time_domain_ramsey_signal = get_signal_slopes(exp_param_factory, nv_ensemble, off_axis_solver, rabi_window_name, B_VECTOR_T, B_PLUS_DB_VECTOR_T, EVOLUTION_STEPS_UNTIL_OPTIMAL, int(MW_RABI_PERIOD_DIVISION/2), NVOrientation.A)
+        slope_dbz_dsignal_dq, slope_dbz_dsignal_inner_product, sq_cancelled_signal, time_domain_ramsey_signal = get_signal_slopes(exp_param_factory, nv_ensemble, off_axis_solver, rabi_window_name, B_VECTOR_T, B_PLUS_DB_VECTOR_T, EVOLUTION_STEPS_UNTIL_OPTIMAL, int(MW_RABI_PERIOD_DIVISION/2), orientation)
         blackman_sensitivity_ratios.append(compare_single_point_sensitivity(slope_dbz_dsignal_dq, slope_dbz_dsignal_inner_product, sq_cancelled_signal, time_domain_ramsey_signal, rabi_window_name, exp_param_factory.get_experiment_parameters(), rng,EVOLUTION_STEPS_UNTIL_OPTIMAL))
         
         rabi_window_name = "boxcar"
-        slope_dbz_dsignal_dq, slope_dbz_dsignal_inner_product, sq_cancelled_signal, time_domain_ramsey_signal = get_signal_slopes(exp_param_factory, nv_ensemble, off_axis_solver, rabi_window_name, B_VECTOR_T, B_PLUS_DB_VECTOR_T, EVOLUTION_STEPS_UNTIL_OPTIMAL, int(MW_RABI_PERIOD_DIVISION/2), NVOrientation.A)
+        slope_dbz_dsignal_dq, slope_dbz_dsignal_inner_product, sq_cancelled_signal, time_domain_ramsey_signal = get_signal_slopes(exp_param_factory, nv_ensemble, off_axis_solver, rabi_window_name, B_VECTOR_T, B_PLUS_DB_VECTOR_T, EVOLUTION_STEPS_UNTIL_OPTIMAL, int(MW_RABI_PERIOD_DIVISION/2), orientation)
         boxcar_sensitivity_ratios.append(compare_single_point_sensitivity(slope_dbz_dsignal_dq, slope_dbz_dsignal_inner_product, sq_cancelled_signal, time_domain_ramsey_signal, rabi_window_name, exp_param_factory.get_experiment_parameters(), rng, EVOLUTION_STEPS_UNTIL_OPTIMAL))
 
     return max_mw_duration_range, blackman_sensitivity_ratios, boxcar_sensitivity_ratios
 
-max_mw_duration_range, blackman_sensitivity_ratios, boxcar_sensitivity_ratios = singlepoint_sensitivity_ratios_vs_mw_pulse_max(False, NVOrientation.A, NV14HyperfineField.N14_plus, 0)
-max_mw_duration_range_hf, blackman_sensitivity_ratios_hf, boxcar_sensitivity_ratios_hf = singlepoint_sensitivity_ratios_vs_mw_pulse_max(True, NVOrientation.A)
+orientation = NVOrientation.B
+hyperfine_line = NV14HyperfineField.N14_0
+hyperfine_line_index = 1
+max_mw_duration_range, blackman_sensitivity_ratios, boxcar_sensitivity_ratios = singlepoint_sensitivity_ratios_vs_mw_pulse_max(False, orientation, hyperfine_line, hyperfine_line_index)
+max_mw_duration_range_hf, blackman_sensitivity_ratios_hf, boxcar_sensitivity_ratios_hf = singlepoint_sensitivity_ratios_vs_mw_pulse_max(True, orientation)
 
 np.savetxt("max_mw_duration_range.txt", max_mw_duration_range)
 np.savetxt("blackman_sensitivity_ratios.txt", blackman_sensitivity_ratios)
@@ -125,7 +128,7 @@ rabi_window = windows.get_window("blackman", 1000)
 np.mean(rabi_window)
 blackman_factor = np.sqrt(np.mean(rabi_window**2))/np.mean(rabi_window)
 
-plt.figure(0, figsize=(3.4, 2))
+plt.figure(0, figsize=(2.9, 1.75))
 plt.rcParams["font.size"] = 9
 plt.rcParams["font.family"] = "arial"
 plt.plot(max_mw_duration_range *S_TO_NS, blackman_sensitivity_ratios, marker="o", linestyle="", label= "Blackman", color="blue")
@@ -134,7 +137,7 @@ plt.hlines(blackman_factor*2*np.sqrt(2), min(max_mw_duration_range*S_TO_NS), max
 plt.plot(max_mw_duration_range *S_TO_NS, boxcar_sensitivity_ratios, marker="o", linestyle="", color="red", label = "Boxcar")
 plt.plot(max_mw_duration_range *S_TO_NS, boxcar_sensitivity_ratios_hf, marker="x", linestyle="", color="red", label = "Boxcar HF")
 plt.hlines(2*np.sqrt(2), min(max_mw_duration_range*S_TO_NS), max(max_mw_duration_range*S_TO_NS), color="red", linestyle="dotted", label = r"2$\sqrt{2}$")
-plt.legend(loc="lower center", ncol=2, bbox_to_anchor=(1.5,.5))
+plt.legend(loc="lower center", ncol=1, bbox_to_anchor=(1.5,.5))
 plt.xlabel("Maximum pulse duration (ns)")
 plt.ylabel("VPDR vs DQ optimal sensitivity")
 plt.ylim((2,6))

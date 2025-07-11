@@ -31,7 +31,8 @@ def optimal_time(tau_s, larmor_actual_hz, t2star_s):
     return 2 * t2s * t * w * np.cos(2 * t * w) + (t2s - 2* t)*np.sin(2 * t * w)
 
 def get_optimal_evolution_time_s(larmor_actual_hz, t2star_s):
-   return fsolve(optimal_time, [t2star_s/1.99], (larmor_actual_hz, t2star_s))[0]
+    result = minimize(minimize_for_opt_evololution_time, [t2star_s/1.99], (larmor_actual_hz, t2star_s), method="Nelder-Mead")
+    return fsolve(optimal_time, result.x[0], (larmor_actual_hz, t2star_s))[0]  
 
 def slope(tau_s, larmor_actual_hz, t2star_s):
     w = 2*np.pi*larmor_actual_hz/2
@@ -43,20 +44,20 @@ def slope(tau_s, larmor_actual_hz, t2star_s):
 def slope_triplet(tau_s, larmor_actual_hz, a_hf_hz, t2star_s):
     return slope(tau_s, larmor_actual_hz, t2star_s) + slope(tau_s, larmor_actual_hz + 2*a_hf_hz, t2star_s) +  + slope(tau_s, larmor_actual_hz - 2*a_hf_hz, t2star_s) 
 
+def minimize_for_opt_evololution_time(evolution_time, larmor_freq_hz, t2star_s):
+    return -np.abs(slope(evolution_time, larmor_freq_hz, t2star_s))
+
 def minimize_for_opt_evololution_time_hf(evolution_time, larmor_freq_mi0, f_h, t2star_s):
     return -np.abs(slope_triplet(evolution_time, larmor_freq_mi0, f_h, t2star_s))
 
 def find_optimal_hf_revival_time(larmor_freq_mi0, f_h, t2star_s):
     hyperfine_revival_times = np.arange(0, 2*t2star_s, 1/(2*f_h))
-    slopes_at_revivals = []
-    for evolution_time in hyperfine_revival_times:
-        slopes_at_revivals.append(slope_triplet(evolution_time, larmor_freq_mi0, f_h, t2star_s ))
+    slopes_at_revivals= slope_triplet(hyperfine_revival_times, larmor_freq_mi0,f_h, t2star_s)
 
-    max_slope_idx = np.where(np.isclose(slopes_at_revivals, max(slopes_at_revivals)))[0][0]
+    max_slope_idx = np.where(np.isclose(np.abs(slopes_at_revivals), max(np.abs(slopes_at_revivals))))[0][0]
     optimal_evolution_time_guess_s = hyperfine_revival_times[max_slope_idx]
 
     result = minimize(minimize_for_opt_evololution_time_hf, [optimal_evolution_time_guess_s], (larmor_freq_mi0, f_h, t2star_s), method="Nelder-Mead")
-
     optimal_evolution_time_s = result.x[0]
     return optimal_evolution_time_s
 
