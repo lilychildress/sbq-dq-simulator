@@ -44,7 +44,7 @@ M_I_VALUES = [-1, 0, 1]
 M_I_GUESS = 1               # Initial guesses are all for mI = 1 peaks in the data
 VOLTAGE_INDEX_TO_PLOT = 8   # This picks out the data at the 4.0 V coil voltage; others will work.
 
-DO_INNER_PRODUCT_PLOT = False   # Provided because the inner product calculation is slow
+DO_INNER_PRODUCT_PLOT = False   # Provided because the inner product calculation (Fig. 7c) is slow
 
 overall_directory = Path("/Users/lilianchildress/Documents/GitHub/sbq-dq-simulator/bff_experiment/data/sorted_by_voltage")
 sorted_voltage_folders = sorted(listdir(overall_directory))
@@ -175,14 +175,26 @@ def minimize_linear_field_discrepancy_function(crystal_coordinate_field_offsets_
         field_projections_ut = field_projections_all_voltages_ut[coil_voltage_index]
         for i, orientation in enumerate(nv_orientations):
             nv_bz = np.dot(np.array(crystal_coordinate_field), np.array(orientation))
-            quantity_to_minimize += (nv_bz**2 - field_projections_ut[i]**2)**2
+            quantity_to_minimize += (np.abs(nv_bz) - np.abs(field_projections_ut[i]))**2    # calculate the sum of squared differences
     return quantity_to_minimize
 
-
+# We provide initial guesses of [2, 1, 2, 4, 12, 20] found by hand (by plotting initial guesses vs data 
+# and adjusting the offsets and slopes until it was close)
 result = minimize(minimize_linear_field_discrepancy_function, [2, 1, 2, 4, 12, 20], (T_TO_UT*field_projections_t, NVaxes_100, voltages))
 bx0, by0, bz0, x_slope, y_slope, z_slope = result.x
 
-# Calculated predicted field projections on each NV axis over a fine range of coil voltages
+# Calculate predicted field projections on each NV axis at the voltages used
+crystal_coordinate_field_vs_voltage = []
+predicted_field_projections_ut = []
+
+for coil_voltage in voltages:
+    crystal_coordinate_field = np.array([bx0+x_slope*coil_voltage, by0+y_slope*coil_voltage, bz0+z_slope*coil_voltage])
+    predicted_field_projections_ut.append(np.abs(NVaxes_100 @ crystal_coordinate_field))
+
+# Determine the rms deviation of the measured projection magnitudes from the predicted projection magnitudes
+print(f"RMS deviation (all orientations, all voltages): {np.mean(np.sqrt((np.array(predicted_field_projections_ut)-T_TO_UT*field_projections_t).flatten()**2))}")
+
+# Calculate predicted field projections on each NV axis over a fine range of coil voltages so we can plot them
 coil_voltages_fine = np.linspace(0,4,201)
 crystal_coordinate_field_vs_voltage_fine = []
 predicted_field_projections_fine_ut = []
