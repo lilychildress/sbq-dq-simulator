@@ -102,9 +102,11 @@ def compare_fit_to_single_point_sensitivity(use_hyperfine, orientation, hyperfin
         plt.vlines(optimal_evolution_time_s, 0, max(slope(evolution_times_fine_s, larmor_actual_hz, T2STAR_S)), color="red")
         plt.show()
 
+    print(f"tau_opt: {optimal_evolution_time_s}, evolution_time_step: {evolution_times_s[1]}, evolution_time_max: {evolution_times_s[-1]}")
+    print(f"pi pulse: {mw_pulse_length_s[1]*int(MW_RABI_PERIOD_DIVISION/2)}, mw_pulse_step: {mw_pulse_length_s[1]}, max_mw_pulse: {mw_pulse_length_s[-1]} ")
     # Find the single-point optimal-time measurement slopes (dbz/dsignal)
     slope_dbz_dsignal_dq, slope_dbz_dsignal_inner_product, sq_cancelled_signal, time_domain_ramsey_signal = get_signal_slopes(exp_param_factory, nv_ensemble, off_axis_solver, rabi_window_name, B_VECTOR_T, B_PLUS_DB_VECTOR_T, EVOLUTION_STEPS_UNTIL_OPTIMAL, int(MW_RABI_PERIOD_DIVISION/2), orientation)  
-    
+        
     # Now add in measurement noise, and see how much that changes the extracted fields
     rng = np.random.default_rng(SEED)
 

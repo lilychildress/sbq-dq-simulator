@@ -25,7 +25,7 @@ B_PLUS_DB_VECTOR_T = (B_MAGNITUDE_T + DELTA_B_T) * np.array(
 )
 
 IDEAL_RABI_FREQUENCIES= np.array([RABI_FREQ_BASE_HZ * perpendicular_projection(MW_DIRECTION, NVaxis) for NVaxis in NVaxes_100])
-MW_RABI_PERIOD_DIVISION = 10
+MW_RABI_PERIOD_DIVISION = 4
 INDEX_FOR_MI0=1
 EVOLUTION_STEPS_UNTIL_OPTIMAL = 10
 
@@ -90,6 +90,7 @@ def singlepoint_sensitivity_ratios_vs_mw_pulse_max(use_hyperfine=False, orientat
 
     max_mw_duration_range = MAX_MW_DURATION_RANGE_S
     mw_step_s = 1/(MW_RABI_PERIOD_DIVISION*IDEAL_RABI_FREQUENCIES[orientation])
+    print(f"MW step: {mw_step_s}, Rabi: {IDEAL_RABI_FREQUENCIES[orientation]*1e-6} MHz, pi pulse: {1/(2*IDEAL_RABI_FREQUENCIES[orientation])}, {mw_step_s*int(MW_RABI_PERIOD_DIVISION/2)}, tau_opt:{optimal_evolution_time_s} ")
 
     blackman_sensitivity_ratios = []
     boxcar_sensitivity_ratios = []
@@ -112,6 +113,7 @@ def singlepoint_sensitivity_ratios_vs_mw_pulse_max(use_hyperfine=False, orientat
     return max_mw_duration_range, blackman_sensitivity_ratios, boxcar_sensitivity_ratios
 
 orientation = NVOrientation.B
+print(NVaxes_100[orientation])
 hyperfine_line = NV14HyperfineField.N14_0
 hyperfine_line_index = 1
 max_mw_duration_range, blackman_sensitivity_ratios, boxcar_sensitivity_ratios = singlepoint_sensitivity_ratios_vs_mw_pulse_max(False, orientation, hyperfine_line, hyperfine_line_index)
