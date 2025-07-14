@@ -1,18 +1,14 @@
 
 import numpy as np
 from matplotlib import pyplot as plt
-from scipy.optimize import fsolve
-from scipy.integrate import quad
 from scipy.signal import windows
-from lmfit import Model
 from bff_paper_figures.inner_product_functions import (
     inner_product_sinusoid,
 )
 
 from bff_paper_figures.extract_experiment_values import  get_true_transition_frequencies
-from bff_paper_figures.simulation_helper_functions import sq_cancelled_signal_generator
 from bff_review_response.sensitivity_helper_functions import get_optimal_evolution_time_s, slope, fit_decaying_cosine, find_optimal_hf_revival_time, slope_triplet, get_signal_slopes
-from bff_paper_figures.fitting_routines import decaying_cosine, offset, fit_three_cos_model
+from bff_paper_figures.fitting_routines import fit_three_cos_model
 from bff_simulator.abstract_classes.abstract_ensemble import NVOrientation, NV14HyperfineField
 from bff_simulator.constants import NVaxes_100, gammab, f_h
 from bff_simulator.homogeneous_ensemble import HomogeneousEnsemble
