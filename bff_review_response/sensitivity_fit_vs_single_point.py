@@ -2,6 +2,7 @@
 import numpy as np
 from matplotlib import pyplot as plt
 from scipy.optimize import fsolve
+from scipy.integrate import quad
 from scipy.signal import windows
 from lmfit import Model
 from bff_paper_figures.inner_product_functions import (
@@ -77,6 +78,7 @@ def compare_fit_to_single_point_sensitivity(use_hyperfine, orientation, hyperfin
 
         # Determine the optimal time for measurement (in theory) and make sure it appears in our evolution times
         larmor_mi0_hz = larmor_freqs_all_axes_hz[orientation][INDEX_FOR_MI0] # double quantum larmor frequency
+        larmor_actual_hz = larmor_mi0_hz
         optimal_evolution_time_s = find_optimal_hf_revival_time(larmor_mi0_hz, f_h, T2STAR_S)
         evolution_times_s = np.arange(0, 2*T2STAR_S, optimal_evolution_time_s/(EVOLUTION_STEPS_UNTIL_OPTIMAL))
         exp_param_factory.set_evolution_times(evolution_times_s)
@@ -110,8 +112,8 @@ def compare_fit_to_single_point_sensitivity(use_hyperfine, orientation, hyperfin
     # Now add in measurement noise, and see how much that changes the extracted fields
     rng = np.random.default_rng(SEED)
 
-    # Select a range of maximum evolution times to consider for fitting; drop the zero-time value.
-    max_evolution_times_indices = np.arange(0, len(evolution_times_s)+1, EVOLUTION_SAMPLE_SPACING)[1:]
+    # Select a range of maximum evolution times to consider for fitting; drop the very short-time values.
+    max_evolution_times_indices = np.arange(0, len(evolution_times_s)+1, EVOLUTION_SAMPLE_SPACING)[2:]
 
     # Get the windowing function for the inner product
     rabi_window = windows.get_window(rabi_window_name, len(mw_pulse_length_s))
@@ -179,12 +181,29 @@ def compare_fit_to_single_point_sensitivity(use_hyperfine, orientation, hyperfin
     fit_sensitivity_ratio_vs_max_evolution_time=np.std(np.array(noisy_fit_bz_t), axis=0)*np.sqrt(max_evolution_times_indices)/vpdr_uncertainty
     fit_sensitivity_ratio_vs_max_evolution_time_dq=np.std(np.array(noisy_fit_bz_dq_t), axis=0)*np.sqrt(max_evolution_times_indices)/dq_uncertainty
 
-    return fit_sensitivity_ratio_vs_max_evolution_time, fit_sensitivity_ratio_vs_max_evolution_time_dq, evolution_times_s[max_evolution_times_indices-1], optimal_evolution_time_s
+    return fit_sensitivity_ratio_vs_max_evolution_time, fit_sensitivity_ratio_vs_max_evolution_time_dq, evolution_times_s[max_evolution_times_indices-1], optimal_evolution_time_s, larmor_actual_hz
 
-fit_sensitivity_ratio_vs_max_evolution_time, fit_sensitivity_ratio_vs_max_evolution_time_dq, sampled_max_evolution_times_s, optimal_evolution_time_s = compare_fit_to_single_point_sensitivity(False, NVOrientation.B, NV14HyperfineField.N14_0, index_for_hf=1)
+fit_sensitivity_ratio_vs_max_evolution_time, fit_sensitivity_ratio_vs_max_evolution_time_dq, sampled_max_evolution_times_s, optimal_evolution_time_s, larmor_hz = compare_fit_to_single_point_sensitivity(False, NVOrientation.B, NV14HyperfineField.N14_0, index_for_hf=1)
 
-fit_sensitivity_ratio_vs_max_evolution_time_hf, fit_sensitivity_ratio_vs_max_evolution_time_dq_hf, sampled_max_evolution_times_hf_s, optimal_evolution_time_hf_s = compare_fit_to_single_point_sensitivity(True, NVOrientation.B)
+fit_sensitivity_ratio_vs_max_evolution_time_hf, fit_sensitivity_ratio_vs_max_evolution_time_dq_hf, sampled_max_evolution_times_hf_s, optimal_evolution_time_hf_s, larmor_mi0_hz = compare_fit_to_single_point_sensitivity(True, NVOrientation.B)
 
+# Determine the expected sensitivity ratios from the average absolute value of the slope of the Ramsey signal
+# compared to its maximum value.
+opt_slope = slope(optimal_evolution_time_s, larmor_hz, T2STAR_S)
+opt_slope_triplet = np.abs(slope_triplet(optimal_evolution_time_hf_s, larmor_mi0_hz, f_h, T2STAR_S))
+
+evolution_times_fine_s = np.arange(0, 2*T2STAR_S, optimal_evolution_time_s/(EVOLUTION_STEPS_UNTIL_OPTIMAL))
+evolution_times_fine_hf_s = np.arange(0, 2*T2STAR_S, optimal_evolution_time_hf_s/(EVOLUTION_STEPS_UNTIL_OPTIMAL))
+abs_triplet_slopes = np.abs(slope_triplet(evolution_times_fine_hf_s, larmor_mi0_hz, f_h, T2STAR_S))
+abs_slopes = np.abs(slope(evolution_times_fine_s, larmor_hz, T2STAR_S))
+
+avg_abs_slopes = []
+for max_idx, max_time in enumerate(evolution_times_fine_s):
+    avg_abs_slopes.append(np.mean(abs_slopes[:max_idx + 1]))
+
+avg_abs_slopes_triplet = []    
+for max_idx, max_time in enumerate(evolution_times_fine_hf_s):
+    avg_abs_slopes_triplet.append(np.mean(abs_triplet_slopes[:max_idx + 1]))
 
 np.savetxt("evolution_times_s.txt", sampled_max_evolution_times_s)
 np.savetxt("fit_sens_ratio_vs_evolution.txt", fit_sensitivity_ratio_vs_max_evolution_time)
@@ -203,6 +222,10 @@ plt.plot(s_to_us*sampled_max_evolution_times_s, fit_sensitivity_ratio_vs_max_evo
 plt.plot(s_to_us*sampled_max_evolution_times_s, fit_sensitivity_ratio_vs_max_evolution_time_dq, marker = "*", linestyle="", label="DQ", color="blue")
 plt.plot(s_to_us*sampled_max_evolution_times_hf_s, fit_sensitivity_ratio_vs_max_evolution_time_hf, marker = ".", linestyle="", markerfacecolor="none",label="VPDR HF", color="green")
 plt.plot(s_to_us*sampled_max_evolution_times_hf_s, fit_sensitivity_ratio_vs_max_evolution_time_dq_hf, marker = "*", linestyle="",  markerfacecolor="none", label="DQ HF", color="green")
+
+plt.plot(s_to_us*evolution_times_fine_s, opt_slope/np.array(avg_abs_slopes), color="blue")
+plt.plot(s_to_us*evolution_times_fine_hf_s, opt_slope_triplet/np.array(avg_abs_slopes_triplet), color="green")
+
 plt.xlabel(r"Maximum free evolution time ($\mu$s)")
 plt.ylabel("Fit sensitivity vs \noptimal-time sensitivity")
 plt.legend()
