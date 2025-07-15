@@ -190,10 +190,11 @@ predicted_field_projections_ut = []
 for coil_voltage in voltages:
     crystal_coordinate_field = np.array([bx0+x_slope*coil_voltage, by0+y_slope*coil_voltage, bz0+z_slope*coil_voltage])
     predicted_field_projections_ut.append(np.abs(NVaxes_100 @ crystal_coordinate_field))
+    crystal_coordinate_field_vs_voltage.append(crystal_coordinate_field)
 
 # Determine the rms deviation of the measured projection magnitudes from the predicted projection magnitudes
 print(f"RMS deviation (all orientations, all voltages): {np.mean(np.sqrt((np.array(predicted_field_projections_ut)-T_TO_UT*field_projections_t).flatten()**2))}")
-
+print(f"Maximum field magnitude: {np.sqrt(np.sum(np.array(crystal_coordinate_field_vs_voltage)[-1]**2))} uT")
 # Calculate predicted field projections on each NV axis over a fine range of coil voltages so we can plot them
 coil_voltages_fine = np.linspace(0,4,201)
 crystal_coordinate_field_vs_voltage_fine = []
