@@ -18,6 +18,8 @@ SEED = 29
 SIG_STD_DEV = 1e-4
 N_SAMPLES = 1000
 N_SAMPLES_FIT = 100
+S_TO_US = 1e6
+S_TO_NS = 1e9
 
 B_VECTOR_T = B_MAGNITUDE_T * np.array(
     [np.sin(B_THETA_FIG4) * np.cos(B_PHI_FIG4), np.sin(B_THETA_FIG4) * np.sin(B_PHI_FIG4), np.cos(B_THETA_FIG4)]
@@ -82,7 +84,7 @@ def fit_vs_tau_opt_sensitivity_vs_max_evolution_time(use_hyperfine=False, orient
     ##################### Determine the optimal-time sensitivities #############################
     # Find the signal response to magnetic field at the best time (which may not be quite the theoretical optimum due to precession during the MW pulses)
     min_dbz_dsignal_vpdr, min_dbz_dsignal_ramsey, tau_opt_vpdr_s, tau_opt_ramsey_s = get_vdpr_and_ramsey_min_slopes(exp_param_factory, nv_ensemble, off_axis_solver, rabi_window_name, optimal_evolution_time_s, t_pi_s, B_VECTOR_T, B_VECTOR_T + DELTA_B_VECTOR_T, orientation, INDEX_FOR_MI0, do_plots = False)
-
+    print(f"Optimal free evolution times for VPDR: {tau_opt_vpdr_s*S_TO_US:.03f} and Ramsey: {tau_opt_ramsey_s*S_TO_US:.03f} vs theory: {optimal_evolution_time_s*S_TO_US:.03f}")
     # Find the noise in the vpdr and ramsey signals at their optimal taus due to injection of Gaussian noise
     n_mw_pulse_lengths = len(MW_PULSE_LENGTH_S)
     vpdr_noise = []
@@ -127,26 +129,22 @@ def fit_vs_tau_opt_sensitivity_vs_max_evolution_time(use_hyperfine=False, orient
         vpdr_fit_vs_tau_opt.append(vpdr_fit_sensitivity/vpdr_sensitivity)
         ramsey_fit_vs_tau_opt.append(ramsey_fit_sensitivity/ramsey_sensitivity)
         slope_ratios.append(theory_slope_ratio)
-        #print(f"Ramsey fit/tau_opt sensitivity ratio: {ramsey_fit_vs_tau_opt[-1]:.02f}, Avg slope ratio: {ramsey_slope_ratio:.02f}")
-        #print(f"VPDR fit/tau_opt sensitivity ratio: {vpdr_fit_vs_tau_opt[-1]:.02f}, Avg slope ratio: {vpdr_slope_ratio:.02f}")
-        #print(f"Theory slope ratio: {theory_slope_ratio:.02f}")
+
     return vpdr_fit_vs_tau_opt, ramsey_fit_vs_tau_opt, slope_ratios
 
 vpdr_fit_vs_tau_opt, ramsey_fit_vs_tau_opt, slope_ratios = fit_vs_tau_opt_sensitivity_vs_max_evolution_time(False, NVOrientation.B, "blackman", SEED)
 vpdr_fit_vs_tau_opt_hf, ramsey_fit_vs_tau_opt_hf, slope_ratios_hf = fit_vs_tau_opt_sensitivity_vs_max_evolution_time(True, NVOrientation.B, "blackman", SEED)
 
-s_to_us = 1e6
-s_to_ns = 1e9
 plt.figure(0, figsize=(2.9, 1.75))
 plt.rcParams["font.size"] = 9
 plt.rcParams["font.family"] = "arial"
-plt.plot(s_to_us*MAX_EVOLUTION_TIMES_S, vpdr_fit_vs_tau_opt, marker = ".", linestyle="", label="VPDR", color="blue")
-plt.plot(s_to_us*MAX_EVOLUTION_TIMES_S, ramsey_fit_vs_tau_opt, marker = "*", linestyle="", label="DQ", color="blue")
-plt.plot(s_to_us*MAX_EVOLUTION_TIMES_S, vpdr_fit_vs_tau_opt_hf, marker = ".", linestyle="", markerfacecolor="none",label="VPDR HF", color="green")
-plt.plot(s_to_us*MAX_EVOLUTION_TIMES_S, ramsey_fit_vs_tau_opt_hf, marker = "*", linestyle="",  markerfacecolor="none", label="DQ HF", color="green")
+plt.plot(S_TO_US*MAX_EVOLUTION_TIMES_S, vpdr_fit_vs_tau_opt, marker = ".", linestyle="", label="VPDR", color="blue")
+plt.plot(S_TO_US*MAX_EVOLUTION_TIMES_S, ramsey_fit_vs_tau_opt, marker = "*", linestyle="", label="DQ", color="blue")
+plt.plot(S_TO_US*MAX_EVOLUTION_TIMES_S, vpdr_fit_vs_tau_opt_hf, marker = ".", linestyle="", markerfacecolor="none",label="VPDR HF", color="green")
+plt.plot(S_TO_US*MAX_EVOLUTION_TIMES_S, ramsey_fit_vs_tau_opt_hf, marker = "*", linestyle="",  markerfacecolor="none", label="DQ HF", color="green")
 
-plt.plot(s_to_us*MAX_EVOLUTION_TIMES_S, slope_ratios, color="blue")
-plt.plot(s_to_us*MAX_EVOLUTION_TIMES_S, slope_ratios_hf, color="green")
+plt.plot(S_TO_US*MAX_EVOLUTION_TIMES_S, slope_ratios, color="blue")
+plt.plot(S_TO_US*MAX_EVOLUTION_TIMES_S, slope_ratios_hf, color="green")
 
 plt.xlabel(r"Maximum free evolution time ($\mu$s)")
 plt.ylabel("Fit sensitivity vs \noptimal-time sensitivity")
