@@ -209,7 +209,7 @@ def get_vdpr_and_ramsey_min_slopes(exp_param_factory:OffAxisFieldExperimentParam
     
     evolution_time_s = exp_param_factory.get_experiment_parameters().evolution_time_s
     
-    if min(np.abs(dbz_dsignal_vpdr))< np.abs(dbz_dsignal_vpdr_tau_opt):
+    if (min(np.abs(dbz_dsignal_vpdr))< np.abs(dbz_dsignal_vpdr_tau_opt)) or optimal_evolution_time_s < 0:
         if do_plots: print("Didn't find best slope at optimal evolution time for VPDR")
         min_dbz_dsignal_vpdr =  min(np.abs(dbz_dsignal_vpdr))
         max_idx = np.argmax(np.abs(1/dbz_dsignal_vpdr))
@@ -220,7 +220,7 @@ def get_vdpr_and_ramsey_min_slopes(exp_param_factory:OffAxisFieldExperimentParam
 
     dbz_dsignal_ramsey = get_ramsey_slope(exp_param_factory, nv_ensemble, off_axis_solver, t_pi_s, b_vector_t, b_plus_db_vector_t, orientation, index_mi0)
     dbz_dsignal_ramsey_tau_opt = get_ramsey_slope_at_tau_opt(optimal_evolution_time_s, exp_param_factory, nv_ensemble, off_axis_solver, t_pi_s, b_vector_t,  b_plus_db_vector_t, orientation, index_mi0)
-    if min(np.abs(dbz_dsignal_ramsey))< np.abs(dbz_dsignal_ramsey_tau_opt):
+    if min(np.abs(dbz_dsignal_ramsey))< np.abs(dbz_dsignal_ramsey_tau_opt) or optimal_evolution_time_s < 0:
         if do_plots: print("Didn't find best slope at optimal evolution time for Ramsey")
         min_dbz_dsignal_ramsey =  min(np.abs(dbz_dsignal_ramsey))
         max_idx = np.argmax(np.abs(1/dbz_dsignal_ramsey))
