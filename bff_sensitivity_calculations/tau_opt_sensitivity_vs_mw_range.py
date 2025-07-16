@@ -13,7 +13,7 @@ from bff_simulator.vector_manipulation import perpendicular_projection
 from bff_simulator.offaxis_field_experiment_parameters import OffAxisFieldExperimentParametersFactory
 from bff_paper_figures.shared_parameters import MW_DIRECTION, E_FIELD_VECTOR_V_PER_CM, RABI_FREQ_BASE_HZ, DETUNING_HZ, T2STAR_S, B_PHI_FIG4, B_THETA_FIG4
 
-B_MAGNITUDE_T = 20e-6
+B_MAGNITUDE_T = 50e-6
 DELTA_B_T = 1e-9
 SEED = 291
 SIG_STD_DEV = 1e-4
