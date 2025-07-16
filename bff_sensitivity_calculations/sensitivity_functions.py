@@ -1,26 +1,18 @@
 import numpy as np
 from scipy.optimize import fsolve, minimize
-from numpy.random import Generator
-
 from matplotlib import pyplot as plt
 from scipy.signal import windows
 from lmfit import Model
-from bff_paper_figures.inner_product_functions import (
-    inner_product_sinusoid,
-)
 
-
+from bff_paper_figures.inner_product_functions import inner_product_sinusoid
 from bff_review_response.sensitivity_helper_functions import get_optimal_evolution_time_no_hf_s, get_optimal_hf_revival_time, slope, slope_triplet, fit_decaying_cosine
 from bff_paper_figures.extract_experiment_values import  get_true_transition_frequencies, get_ideal_rabi_frequencies
 from bff_paper_figures.simulation_helper_functions import sq_cancelled_signal_generator
 from bff_paper_figures.fitting_routines import decaying_cosine, offset, fit_three_cos_model
-from bff_simulator.abstract_classes.abstract_ensemble import NVOrientation, NV14HyperfineField
-from bff_simulator.constants import NVaxes_100, gammab, f_h
-from bff_simulator.homogeneous_ensemble import HomogeneousEnsemble
-from bff_simulator.liouvillian_solver import LiouvillianSolver
-from bff_simulator.vector_manipulation import perpendicular_projection
+from bff_simulator.abstract_classes.abstract_ensemble import NVOrientation
+from bff_simulator.constants import gammab, f_h
 from bff_simulator.offaxis_field_experiment_parameters import OffAxisFieldExperimentParametersFactory, OffAxisFieldExperimentParameters
-from bff_paper_figures.shared_parameters import  MW_DIRECTION, E_FIELD_VECTOR_V_PER_CM, RABI_FREQ_BASE_HZ, DETUNING_HZ, T2STAR_S, B_PHI_FIG4, B_THETA_FIG4
+from bff_paper_figures.shared_parameters import  T2STAR_S
 
 EVOLUTION_TIME_S = np.arange(0, 3e-6, 20e-9)  # p.linspace(0, 15e-6, 801)
 INDEX_FOR_MI0 = 1
