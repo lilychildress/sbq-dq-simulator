@@ -18,8 +18,7 @@ DELTA_B_T = 1e-9
 SEED = 291
 SIG_STD_DEV = 1e-4
 N_SAMPLES = 1000
-B_THETA_FIG4 = 0.1
-B_PHI_FIG4 = 0.5
+
 B_VECTOR_T = B_MAGNITUDE_T * np.array(
     [np.sin(B_THETA_FIG4) * np.cos(B_PHI_FIG4), np.sin(B_THETA_FIG4) * np.sin(B_PHI_FIG4), np.cos(B_THETA_FIG4)]
 )
